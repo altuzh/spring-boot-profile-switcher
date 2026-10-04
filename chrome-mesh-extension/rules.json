@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "regexSubstitution": "https://ui.mesh-java.test.ecp/graphiql/index.html#\\1"
+      }
+    },
+    "condition": {
+      "regexFilter": "^https://ui\\.mesh-java\\.test\\.ecp/graphiql/(?:index\\.html)?\\?(query=.*)$",
+      "resourceTypes": ["main_frame"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {
+      "type": "redirect",
+      "redirect": {
+        "regexSubstitution": "https://ui.mesh-java.uat.ecp/graphiql/index.html#\\1"
+      }
+    },
+    "condition": {
+      "regexFilter": "^https://ui\\.mesh-java\\.uat\\.ecp/graphiql/(?:index\\.html)?\\?(query=.*)$",
+      "resourceTypes": ["main_frame"]
+    }
+  }
+]

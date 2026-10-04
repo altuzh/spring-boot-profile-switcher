@@ -1,0 +1,7 @@
+# Chrome extension generated files
+_metadata/
+*.crx
+
+# OS files
+.DS_Store
+Thumbs.db

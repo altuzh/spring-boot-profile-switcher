@@ -1,0 +1,164 @@
+<idea-plugin>
+    <id>spring-boot-profile-switcher</id>
+    <name>Spring Boot Profile Switcher</name>
+    <version>1.0.24</version>
+    <vendor email="altuzh@users.noreply.github.com" url="https://github.com/altuzh/spring-boot-profile-switcher">Alexey Tuzhikov</vendor>
+
+    <description><![CDATA[
+        <h3>Spring Boot Profile Switcher</h3>
+        <p>A powerful IntelliJ IDEA plugin designed for Spring Boot (2.x / 3.x) applications.</p>
+        <ul>
+            <li><b>Automatic Configuration Discovery:</b> Detects all <code>application*.yml</code> and <code>application*.yaml</code> files in <code>src/main/resources</code> and configured custom folders. Automatically synchronizes with VFS changes.</li>
+            <li><b>Toolbar ComboBox Action:</b> Quickly switch active profiles from the Navigation Bar or Main Toolbar.</li>
+            <li><b>Dual Switching Modes:</b>
+                <ul>
+                    <li><i>Profile / Parameter Mode (Non-destructive):</i> Injects <code>--spring.profiles.active=&lt;profile&gt;</code> or <code>--spring.config.additional-location=&lt;path&gt;</code> into your Run Configuration and restarts the application seamlessly.</li>
+                    <li><i>File Swap Mode:</i> Safely swaps <code>application.yml</code> with your selected profile YAML (with automatic <code>.bak</code> backup).</li>
+                </ul>
+            </li>
+            <li><b>Built-in Diff Viewer:</b> One-click comparison between any profile YAML and the base <code>application.yml</code> using IntelliJ's native Diff tool.</li>
+            <li><b>Log & Error Diagnostic Studio:</b> Real-time error categorization, root cause extraction, interactive stack trace navigation with jump-to-source, and Markdown reports.</li>
+            <li><b>GraphQL Observability:</b> Real-time stream capture and inspection for GraphQL requests, responses, formatted JSON, variables, latency, and cURL commands.</li>
+            <li><b>Session Log & Terminal Filtering:</b> Persistent session.log auto-replaced on relaunch, with configurable terminal output levels (DEBUG, INFO, WARN, ERROR).</li>
+            <li><b>Custom Options:</b> Per-profile custom VM options (e.g. for Spring Cloud config paths) and arguments.</li>
+            <li><b>Dynamic Hot-Reloading:</b> Reload updated plugin distributions directly from disk without restarting IntelliJ IDEA.</li>
+        </ul>
+    ]]></description>
+
+    <!-- Platform and Java module dependencies -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Persistent Project Settings -->
+        <projectService serviceImplementation="configswitcher.state.PluginSettingsState"/>
+
+        <!-- Core Services -->
+        <projectService serviceImplementation="configswitcher.service.ConfigScannerService"/>
+        <projectService serviceImplementation="configswitcher.service.AppRunManager"/>
+        <projectService serviceImplementation="configswitcher.service.GitPatchService"/>
+        <projectService serviceImplementation="configswitcher.service.AppStatusService"/>
+        <projectService serviceImplementation="configswitcher.mesh.service.MeshCaptureService"/>
+        <projectService serviceImplementation="configswitcher.service.SessionLogManager"/>
+
+        <!-- Log & Error Analyzer Tool Window (with GraphQL Mesh) -->
+        <toolWindow id="Log &amp; Error Analyzer"
+                    anchor="bottom"
+                    icon="/icons/meshIcon.svg"
+                    factoryClass="configswitcher.mesh.ui.MeshToolWindowFactory"
+                    canCloseContent="false"/>
+
+        <!-- Project Settings Page under Tools -->
+        <projectConfigurable parentId="tools"
+                             id="configswitcher.settings"
+                             displayName="Spring Boot Profile Switcher"
+                             instance="configswitcher.ui.PluginSettingsConfigurable"/>
+
+        <!-- Notifications -->
+        <notificationGroup id="Spring Boot Profile Switcher"
+                           displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <!-- ComboBox Switcher Widget -->
+        <action id="configswitcher.ui.ConfigSwitcherComboBoxAction"
+                class="configswitcher.ui.ConfigSwitcherComboBoxAction"
+                text="Profile Switcher"
+                description="Switch active configuration profile"
+                icon="/icons/switchIcon.svg">
+            <!-- Add to Navigation Bar -->
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="NavBarVcsGroup"/>
+            <!-- Add to Classic Main Toolbar -->
+            <add-to-group group-id="MainToolBar" anchor="before" relative-to-action="RunConfiguration"/>
+            <!-- Add to New UI Toolbar -->
+            <add-to-group group-id="MainToolbarRight" anchor="first"/>
+        </action>
+
+        <!-- Start / Stop Application Action -->
+        <action id="configswitcher.ui.StartStopConfigAction"
+                class="configswitcher.ui.StartStopConfigAction"
+                text="Start / Stop Application"
+                description="Start or stop application with the selected profile">
+            <!-- Add to Navigation Bar -->
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <!-- Add to Classic Main Toolbar -->
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <!-- Add to New UI Toolbar -->
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+        </action>
+
+        <!-- Rebuild & Restart Action -->
+        <action id="configswitcher.ui.RebuildAndRestartAction"
+                class="configswitcher.ui.RebuildAndRestartAction"
+                text="Rebuild &amp; Restart"
+                description="Rebuild project/pipeline and restart application with the selected profile">
+            <!-- Add to Navigation Bar -->
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.StartStopConfigAction"/>
+            <!-- Add to Classic Main Toolbar -->
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.StartStopConfigAction"/>
+            <!-- Add to New UI Toolbar -->
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.StartStopConfigAction"/>
+        </action>
+
+        <!-- Application Startup & Health Status Widget -->
+        <action id="configswitcher.ui.AppStatusWidgetAction"
+                class="configswitcher.ui.AppStatusWidgetAction"
+                text="App Status"
+                description="Shows application startup stage and health (Tomcat, Started, Error)">
+            <!-- Add to Navigation Bar -->
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <!-- Add to Classic Main Toolbar -->
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <!-- Add to New UI Toolbar -->
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+        </action>
+
+        <!-- Quick Run / Restart with Selected Profile -->
+        <action id="configswitcher.ui.RunSelectedConfigAction"
+                class="configswitcher.ui.RunSelectedConfigAction"
+                text="Run Active Profile"
+                description="Run or restart application with the currently selected profile">
+            <add-to-group group-id="ToolbarRunGroup" anchor="after" relative-to-action="Run"/>
+        </action>
+
+        <!-- Diff Viewer Action -->
+        <action id="configswitcher.ui.CompareConfigDiffAction"
+                class="configswitcher.ui.CompareConfigDiffAction"
+                text="Compare Config with Base application.yml"
+                description="Compare selected profile configuration with base application.yml">
+            <add-to-group group-id="Diff.EditorPopupMenu" anchor="last"/>
+        </action>
+
+        <!-- Log & Error Analyzer Action -->
+        <action id="configswitcher.mesh.ui.OpenMeshInspectorAction"
+                class="configswitcher.mesh.ui.OpenMeshInspectorAction"
+                text="Log &amp; Error Analyzer"
+                description="Open Log &amp; Error Diagnostic Studio and GraphQL Mesh Inspector">
+            <!-- Add to Navigation Bar -->
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.AppStatusWidgetAction"/>
+            <!-- Add to Classic Main Toolbar -->
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.AppStatusWidgetAction"/>
+            <!-- Add to New UI Toolbar -->
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.AppStatusWidgetAction"/>
+            <!-- Add to Tools Menu -->
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <!-- Log File Scanner Action -->
+        <action id="configswitcher.mesh.ui.OpenLogScannerAction"
+                class="configswitcher.mesh.ui.OpenLogScannerAction"
+                text="Log File Scanner"
+                description="Open Log Scanner to inspect and filter session.log">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+
+        <!-- Settings Action in Tools Menu -->
+        <action id="configswitcher.ui.OpenPluginSettingsAction"
+                class="configswitcher.ui.OpenPluginSettingsAction"
+                text="Settings..."
+                description="Open settings">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
