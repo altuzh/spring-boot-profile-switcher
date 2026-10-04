@@ -119,7 +119,7 @@ tasks.register('installToRunningIde') {
         jbDir.listFiles().each { ideDir ->
             if (ideDir.isDirectory() && (ideDir.name.contains('Idea') || ideDir.name.contains('WebStorm') || ideDir.name.contains('PyCharm'))) {
                 // Remove legacy plugin directories with obsolete names
-                ['config-switcher'].each { legacyName ->
+                ['config-switcher', 'n2o-profile-switcher', 'idea-config-switcher'].each { legacyName ->
                     def legacyDir = new File(ideDir, "plugins/${legacyName}")
                     if (legacyDir.exists()) {
                         try {
@@ -163,6 +163,16 @@ tasks.register('installToRunningIde') {
                                 retiredDir.mkdirs()
                                 def retiredFile = new File(retiredDir, "${f.name}-${System.currentTimeMillis()}.jar")
                                 f.renameTo(retiredFile)
+                            }
+                        }
+                    }
+
+                    // Purge old retired switcher jar files from system/retired_plugins
+                    def retiredDir = new File(ideDir, "system/retired_plugins")
+                    if (retiredDir.exists()) {
+                        retiredDir.listFiles()?.each { rf ->
+                            if (rf.name.startsWith("config-switcher") || rf.name.startsWith("n2o-profile-switcher") || rf.name.startsWith("spring-boot-profile-switcher")) {
+                                try { rf.delete() } catch (Exception ignored) {}
                             }
                         }
                     }
