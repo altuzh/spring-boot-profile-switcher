@@ -3,7 +3,7 @@ package configswitcher.service;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.OSProcessHandler;
-import com.intellij.execution.process.ProcessAdapter;
+import com.intellij.execution.process.ProcessListener;
 import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessHandler;
 import com.intellij.execution.process.ProcessOutputTypes;
@@ -136,7 +136,7 @@ public class PipelineProcessHandler extends ProcessHandler {
             if (preProc != null) {
                 WindowsJobObjectManager.assignProcess(preProc);
             }
-            handler.addProcessListener(new ProcessAdapter() {
+            handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
                     if (rawOutputConsumer != null) {
@@ -226,7 +226,7 @@ public class PipelineProcessHandler extends ProcessHandler {
                     }
                 }
             }
-            handler.addProcessListener(new ProcessAdapter() {
+            handler.addProcessListener(new ProcessListener() {
                 @Override
                 public void onTextAvailable(@NotNull ProcessEvent event, @NotNull Key outputType) {
                     String text = event.getText();

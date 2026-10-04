@@ -39,6 +39,7 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
+@SuppressWarnings("deprecation")
 public class PluginSettingsConfigurable implements SearchableConfigurable {
     public static final String ID = "configswitcher.settings";
 

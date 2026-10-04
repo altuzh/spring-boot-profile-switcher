@@ -430,7 +430,7 @@ public class ConfigScannerTest {
                 () -> appTerminated.set(true)
         );
 
-        handler.addProcessListener(new com.intellij.execution.process.ProcessAdapter() {
+        handler.addProcessListener(new com.intellij.execution.process.ProcessListener() {
             @Override
             public void onTextAvailable(@NotNull com.intellij.execution.process.ProcessEvent event, @NotNull com.intellij.openapi.util.Key outputType) {
                 output.append(event.getText());
@@ -464,7 +464,7 @@ public class ConfigScannerTest {
                 () -> appTerminated.set(true)
         );
 
-        handler.addProcessListener(new com.intellij.execution.process.ProcessAdapter() {
+        handler.addProcessListener(new com.intellij.execution.process.ProcessListener() {
             @Override
             public void onTextAvailable(@NotNull com.intellij.execution.process.ProcessEvent event, @NotNull com.intellij.openapi.util.Key outputType) {
                 output.append(event.getText());
@@ -502,7 +502,7 @@ public class ConfigScannerTest {
                 () -> appTerminated.set(true)
         );
 
-        handler.addProcessListener(new com.intellij.execution.process.ProcessAdapter() {
+        handler.addProcessListener(new com.intellij.execution.process.ProcessListener() {
             @Override
             public void onTextAvailable(@NotNull com.intellij.execution.process.ProcessEvent event, @NotNull com.intellij.openapi.util.Key outputType) {
                 output.append(event.getText());

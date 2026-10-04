@@ -57,6 +57,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 @Service(Service.Level.PROJECT)
+@SuppressWarnings("deprecation")
 public final class AppRunManager implements Disposable {
     private final Project project;
     private volatile ProcessHandler activePipelineProcess = null;

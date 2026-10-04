@@ -11,6 +11,7 @@ import java.awt.*;
  * Modern context help component that displays a blue circular '?' icon
  * with interactive HTML tooltips containing descriptions and instructions.
  */
+@SuppressWarnings("deprecation")
 public class HelpLabel extends JLabel {
 
     public HelpLabel(@Nullable String tooltipText) {

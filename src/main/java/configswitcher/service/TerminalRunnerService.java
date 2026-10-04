@@ -38,6 +38,7 @@ import java.util.function.Consumer;
  * reusing the active/current terminal tab if available, or creating a new tab.
  * Accurately detects and supports PowerShell, CMD, and Bash/POSIX shells.
  */
+@SuppressWarnings({"deprecation", "removal"})
 public final class TerminalRunnerService {
 
     public static final Key<Boolean> IS_PIPELINE_TAB = Key.create("ConfigSwitcher.IsPipelineTab");

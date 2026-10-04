@@ -29,6 +29,7 @@ import java.awt.event.MouseEvent;
  * 3. Application started (Green)
  * 4. ERROR (Red)
  */
+@SuppressWarnings("deprecation")
 public class AppStatusWidgetAction extends AnAction implements CustomComponentAction, DumbAware {
 
     public AppStatusWidgetAction() {

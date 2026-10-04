@@ -80,6 +80,8 @@ tasks.register('installToRunningIde') {
         // Run locally only (skip in CI pipelines like GitHub Actions)
         System.getenv('CI') == null && System.getenv('GITHUB_ACTIONS') == null
     }
+    def pluginVersion = project.version.toString()
+    def jarProvider = jar.archiveFile
     doLast {
         def appData = System.getenv('APPDATA')
         if (!appData) {
@@ -111,7 +113,7 @@ tasks.register('installToRunningIde') {
             println "[Local Install] No running IDE detected; installing to installed JetBrains IDE directories."
         }
 
-        def jarFile = jar.archiveFile.get().asFile
+        def jarFile = jarProvider.get().asFile
         int installedCount = 0
 
         jbDir.listFiles().each { ideDir ->
@@ -134,7 +136,7 @@ tasks.register('installToRunningIde') {
                     if (!pluginLib.exists()) {
                         pluginLib.mkdirs()
                     }
-                    def destFile = new File(pluginLib, "spring-boot-profile-switcher-${project.version}.jar")
+                    def destFile = new File(pluginLib, "spring-boot-profile-switcher-${pluginVersion}.jar")
                     try {
                         java.nio.file.Files.copy(jarFile.toPath(), destFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
                         println "[Local Install] Installed to: ${ideDir.name} (${destFile.name})"
