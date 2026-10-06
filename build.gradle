@@ -89,18 +89,18 @@ tasks.register('installToRunningIde') {
             return
         }
 
-        def jbDir = new File(appData, 'JetBrains')
-        if (!jbDir.exists()) {
-            println "[Local Install] JetBrains directory not found in APPDATA (${jbDir}), skipping."
+        def ideRootDirs = [new File(appData, 'JetBrains'), new File(appData, 'OpenIDE')].findAll { it.exists() }
+        if (ideRootDirs.isEmpty()) {
+            println "[Local Install] Neither JetBrains nor OpenIDE directory found in APPDATA, skipping."
             return
         }
 
-        // Detect running JetBrains processes
+        // Detect running JetBrains / OpenIDE processes
         def runningProcesses = []
         try {
             ProcessHandle.allProcesses().each { ph ->
                 def cmd = ph.info().command().orElse('').toLowerCase()
-                if (cmd.contains('idea64') || cmd.contains('idea.exe') || cmd.contains('webstorm')) {
+                if (cmd.contains('idea64') || cmd.contains('idea.exe') || cmd.contains('webstorm') || cmd.contains('openide')) {
                     def name = cmd.substring(Math.max(0, Math.max(cmd.lastIndexOf('/'), cmd.lastIndexOf('\\')) + 1))
                     runningProcesses.add(name)
                 }
@@ -110,69 +110,71 @@ tasks.register('installToRunningIde') {
         if (!runningProcesses.isEmpty()) {
             println "[Local Install] Detected running IDE: ${runningProcesses.unique().join(', ')}"
         } else {
-            println "[Local Install] No running IDE detected; installing to installed JetBrains IDE directories."
+            println "[Local Install] No running IDE detected; installing to installed JetBrains / OpenIDE directories."
         }
 
         def jarFile = jarProvider.get().asFile
         int installedCount = 0
 
-        jbDir.listFiles().each { ideDir ->
-            if (ideDir.isDirectory() && (ideDir.name.contains('Idea') || ideDir.name.contains('WebStorm') || ideDir.name.contains('PyCharm'))) {
-                // Remove legacy plugin directories with obsolete names
-                ['config-switcher', 'n2o-profile-switcher', 'idea-config-switcher'].each { legacyName ->
-                    def legacyDir = new File(ideDir, "plugins/${legacyName}")
-                    if (legacyDir.exists()) {
-                        try {
-                            legacyDir.deleteDir()
-                            println "[Local Install] Deleted legacy plugin directory in ${ideDir.name}: ${legacyName}"
-                        } catch (Exception ex) {
-                            println "[Local Install] Warning: Failed to delete legacy ${legacyName} in ${ideDir.name}: ${ex.message}"
-                        }
-                    }
-                }
-
-                def pluginLib = new File(ideDir, "plugins/spring-boot-profile-switcher/lib")
-                if (pluginLib.exists() || new File(ideDir, "plugins").exists()) {
-                    if (!pluginLib.exists()) {
-                        pluginLib.mkdirs()
-                    }
-                    def destFile = new File(pluginLib, "spring-boot-profile-switcher-${pluginVersion}.jar")
-                    try {
-                        java.nio.file.Files.copy(jarFile.toPath(), destFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-                        println "[Local Install] Installed to: ${ideDir.name} (${destFile.name})"
-                        installedCount++
-                    } catch (Exception ex) {
-                        // Direct copy locked by running JVM (mapped memory section), rename outside pluginLib then copy
-                        def retiredDir = new File(ideDir, "system/retired_plugins")
-                        retiredDir.mkdirs()
-                        def retiredFile = new File(retiredDir, "spring-boot-profile-switcher-${System.currentTimeMillis()}.jar")
-                        if (destFile.renameTo(retiredFile)) {
-                            java.nio.file.Files.copy(jarFile.toPath(), destFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-                            println "[Local Install] Installed to running ${ideDir.name} via atomic rename (${destFile.name})"
-                            installedCount++
-                        } else {
-                            println "[Local Install] Warning: Failed to replace file in ${ideDir.name}: ${ex.message}"
-                        }
-                    }
-
-                    // Ensure only destFile remains in the lib directory
-                    pluginLib.listFiles()?.each { f ->
-                        if (f.name != destFile.name) {
-                            if (!f.delete()) {
-                                def retiredDir = new File(ideDir, "system/retired_plugins")
-                                retiredDir.mkdirs()
-                                def retiredFile = new File(retiredDir, "${f.name}-${System.currentTimeMillis()}.jar")
-                                f.renameTo(retiredFile)
+        ideRootDirs.each { rootDir ->
+            rootDir.listFiles()?.each { ideDir ->
+                if (ideDir.isDirectory() && (ideDir.name.contains('Idea') || ideDir.name.contains('WebStorm') || ideDir.name.contains('PyCharm') || ideDir.name.contains('OpenIDE'))) {
+                    // Remove legacy plugin directories with obsolete names
+                    ['config-switcher', 'n2o-profile-switcher', 'idea-config-switcher'].each { legacyName ->
+                        def legacyDir = new File(ideDir, "plugins/${legacyName}")
+                        if (legacyDir.exists()) {
+                            try {
+                                legacyDir.deleteDir()
+                                println "[Local Install] Deleted legacy plugin directory in ${ideDir.name}: ${legacyName}"
+                            } catch (Exception ex) {
+                                println "[Local Install] Warning: Failed to delete legacy ${legacyName} in ${ideDir.name}: ${ex.message}"
                             }
                         }
                     }
 
-                    // Purge old retired switcher jar files from system/retired_plugins
-                    def retiredDir = new File(ideDir, "system/retired_plugins")
-                    if (retiredDir.exists()) {
-                        retiredDir.listFiles()?.each { rf ->
-                            if (rf.name.startsWith("config-switcher") || rf.name.startsWith("n2o-profile-switcher") || rf.name.startsWith("spring-boot-profile-switcher")) {
-                                try { rf.delete() } catch (Exception ignored) {}
+                    def pluginLib = new File(ideDir, "plugins/spring-boot-profile-switcher/lib")
+                    if (pluginLib.exists() || new File(ideDir, "plugins").exists()) {
+                        if (!pluginLib.exists()) {
+                            pluginLib.mkdirs()
+                        }
+                        def destFile = new File(pluginLib, "spring-boot-profile-switcher-${pluginVersion}.jar")
+                        try {
+                            java.nio.file.Files.copy(jarFile.toPath(), destFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                            println "[Local Install] Installed to: ${ideDir.name} (${destFile.name})"
+                            installedCount++
+                        } catch (Exception ex) {
+                            // Direct copy locked by running JVM (mapped memory section), rename outside pluginLib then copy
+                            def retiredDir = new File(ideDir, "system/retired_plugins")
+                            retiredDir.mkdirs()
+                            def retiredFile = new File(retiredDir, "spring-boot-profile-switcher-${System.currentTimeMillis()}.jar")
+                            if (destFile.renameTo(retiredFile)) {
+                                java.nio.file.Files.copy(jarFile.toPath(), destFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                                println "[Local Install] Installed to running ${ideDir.name} via atomic rename (${destFile.name})"
+                                installedCount++
+                            } else {
+                                println "[Local Install] Warning: Failed to replace file in ${ideDir.name}: ${ex.message}"
+                            }
+                        }
+
+                        // Ensure only destFile remains in the lib directory
+                        pluginLib.listFiles()?.each { f ->
+                            if (f.name != destFile.name) {
+                                if (!f.delete()) {
+                                    def retiredDir = new File(ideDir, "system/retired_plugins")
+                                    retiredDir.mkdirs()
+                                    def retiredFile = new File(retiredDir, "${f.name}-${System.currentTimeMillis()}.jar")
+                                    f.renameTo(retiredFile)
+                                }
+                            }
+                        }
+
+                        // Purge old retired switcher jar files from system/retired_plugins
+                        def retiredDir = new File(ideDir, "system/retired_plugins")
+                        if (retiredDir.exists()) {
+                            retiredDir.listFiles()?.each { rf ->
+                                if (rf.name.startsWith("config-switcher") || rf.name.startsWith("n2o-profile-switcher") || rf.name.startsWith("spring-boot-profile-switcher")) {
+                                    try { rf.delete() } catch (Exception ignored) {}
+                                }
                             }
                         }
                     }
