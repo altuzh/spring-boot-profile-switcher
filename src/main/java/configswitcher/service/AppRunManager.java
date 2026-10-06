@@ -1203,6 +1203,7 @@ public final class AppRunManager implements Disposable {
         }
         File projectDir = new File(project.getBasePath());
         String targetJar = findTargetJar(projectDir);
+        String n2oConfigPath = findN2oConfigPath(projectDir);
 
         StringBuilder sb = new StringBuilder("java -jar ");
         if (targetJar.contains(" ")) {
@@ -1211,6 +1212,15 @@ public final class AppRunManager implements Disposable {
             sb.append(targetJar);
         }
         sb.append(" --debug");
+
+        if (n2oConfigPath != null && !n2oConfigPath.isBlank()) {
+            sb.append(" --n2o.config.path=");
+            if (n2oConfigPath.contains(" ")) {
+                sb.append("\"").append(n2oConfigPath).append("\"");
+            } else {
+                sb.append(n2oConfigPath);
+            }
+        }
         sb.append(" --spring.profiles.active={profile},auth-dev");
 
         return sb.toString();
@@ -1289,7 +1299,70 @@ public final class AppRunManager implements Disposable {
         }
     }
 
+    @NotNull
+    public static String findN2oConfigPath(@NotNull File projectDir) {
+        // 1. Direct standard location: <projectDir>/src/main/resources/META-INF/conf
+        File defaultConf = new File(projectDir, "src/main/resources/META-INF/conf");
+        if (defaultConf.isDirectory()) {
+            return defaultConf.getAbsolutePath();
+        }
 
+        // 2. Search recursively in project for any directory named 'conf' whose parent is 'META-INF'
+        File found = searchForMetaInfConf(projectDir, 0);
+        if (found != null && found.isDirectory()) {
+            return found.getAbsolutePath();
+        }
+
+        // 3. Search for any src/main/resources in modules
+        File foundResources = searchForResourcesDir(projectDir, 0);
+        if (foundResources != null && foundResources.isDirectory()) {
+            return new File(foundResources, "META-INF/conf").getAbsolutePath();
+        }
+
+        return defaultConf.getAbsolutePath();
+    }
+
+    @Nullable
+    private static File searchForMetaInfConf(@NotNull File dir, int depth) {
+        if (depth > 6) return null;
+        File[] files = dir.listFiles();
+        if (files == null) return null;
+
+        for (File f : files) {
+            if (f.isDirectory() && !isIgnoredDir(f.getName())) {
+                if (f.getName().equals("conf")) {
+                    File parent = f.getParentFile();
+                    if (parent != null && parent.getName().equals("META-INF")) {
+                        return f;
+                    }
+                }
+                File sub = searchForMetaInfConf(f, depth + 1);
+                if (sub != null) return sub;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static File searchForResourcesDir(@NotNull File dir, int depth) {
+        if (depth > 5) return null;
+        File[] files = dir.listFiles();
+        if (files == null) return null;
+
+        for (File f : files) {
+            if (f.isDirectory() && !isIgnoredDir(f.getName())) {
+                if (f.getName().equals("resources")) {
+                    File mainDir = f.getParentFile();
+                    if (mainDir != null && mainDir.getName().equals("main")) {
+                        return f;
+                    }
+                }
+                File sub = searchForResourcesDir(f, depth + 1);
+                if (sub != null) return sub;
+            }
+        }
+        return null;
+    }
 
     private static boolean isIgnoredDir(@NotNull String name) {
         return name.startsWith(".") || "target".equalsIgnoreCase(name) || "build".equalsIgnoreCase(name)

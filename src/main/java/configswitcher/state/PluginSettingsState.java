@@ -86,7 +86,10 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
 
     public static boolean isLegacyDefaultTemplate(@Nullable String template) {
         if (template == null || template.isBlank()) return true;
-        if ("java -jar target/server.jar --debug".equals(template.trim())) return true;
+        String trimmed = template.trim();
+        if ("java -jar target/server.jar --debug".equals(trimmed)) return true;
+        if ("java -jar target/server.jar --debug --spring.profiles.active={profile}".equals(trimmed)) return true;
+        if ("java -jar target/server.jar --debug --spring.profiles.active={profile},auth-dev".equals(trimmed)) return true;
         return template.contains("C:\\Users\\al\\projects\\bft\\co")
                 || template.contains("C:/Users/al/projects/bft/co");
     }

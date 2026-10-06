@@ -728,9 +728,15 @@ public class ConfigScannerTest {
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(""));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate("   "));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
+                "java -jar target/server.jar --debug --n2o.config.path=C:\\Users\\al\\projects\\bft\\co\\src\\main\\resources\\META-INF\\conf --spring.profiles.active={profile}"));
+        assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/server.jar --debug --config.path=C:\\Users\\al\\projects\\bft\\co\\src\\main\\resources\\META-INF\\conf --spring.profiles.active={profile}"));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/server.jar --debug"));
+        assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
+                "java -jar target/server.jar --debug --spring.profiles.active={profile}"));
+        assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
+                "java -jar target/server.jar --debug --spring.profiles.active={profile},auth-dev"));
         assertFalse(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/my-app.jar --spring.profiles.active={profile}"));
     }
@@ -742,16 +748,35 @@ public class ConfigScannerTest {
     }
 
     @Test
-    public void testFindTargetJar_WithTempDirectory() throws Exception {
-        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("test_app_proj_");
+    public void testFindTargetJarAndN2oConfigPath_WithTempDirectory() throws Exception {
+        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("test_n2o_proj_");
         try {
             java.nio.file.Path targetDir = tempDir.resolve("target");
             java.nio.file.Files.createDirectories(targetDir);
             java.nio.file.Path jarFile = targetDir.resolve("server.jar");
             java.nio.file.Files.createFile(jarFile);
 
+            java.nio.file.Path confDir = tempDir.resolve("src/main/resources/META-INF/conf");
+            java.nio.file.Files.createDirectories(confDir);
+
             String jar = configswitcher.service.AppRunManager.findTargetJar(tempDir.toFile());
             assertEquals("target/server.jar", jar);
+
+            String confPath = configswitcher.service.AppRunManager.findN2oConfigPath(tempDir.toFile());
+            assertEquals(confDir.toFile().getAbsolutePath(), confPath);
+
+            com.intellij.openapi.project.Project proj = (com.intellij.openapi.project.Project) java.lang.reflect.Proxy.newProxyInstance(
+                    com.intellij.openapi.project.Project.class.getClassLoader(),
+                    new Class<?>[]{com.intellij.openapi.project.Project.class},
+                    (proxy, method, args) -> {
+                        if ("getBasePath".equals(method.getName())) return tempDir.toFile().getAbsolutePath();
+                        return null;
+                    }
+            );
+            String calculated = configswitcher.service.AppRunManager.calculateDefaultCommandTemplate(proj);
+            assertTrue(calculated.startsWith("java -jar target/server.jar --debug --n2o.config.path="));
+            assertTrue(calculated.contains(confPath));
+            assertTrue(calculated.endsWith("--spring.profiles.active={profile},auth-dev"));
         } finally {
             // Cleanup
             try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(tempDir)) {

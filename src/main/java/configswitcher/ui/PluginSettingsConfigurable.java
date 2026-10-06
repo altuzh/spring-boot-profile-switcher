@@ -358,7 +358,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
 
         JPanel recalcEast = new JPanel(new FlowLayout(FlowLayout.RIGHT, JBUI.scale(4), 0));
         recalculateBtn = new JButton("Recalculate Command Template", AllIcons.Actions.Refresh);
-        recalculateBtn.setToolTipText("Auto-detect target JAR and Spring config from current project");
+        recalculateBtn.setToolTipText("Auto-detect target JAR and N2O config path from current project");
         recalculateBtn.addActionListener(e -> {
             String calculated = AppRunManager.calculateDefaultCommandTemplate(project);
             runCommandTemplateArea.setText(calculated);

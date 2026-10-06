@@ -78,8 +78,8 @@ public final class I18n {
                 "Шаблон команды (подстановки: {profile}, {filePath}):");
         put("settings.run.recalc_btn", "Recalculate Command Template", "Пересчитать шаблон команды");
         put("settings.run.recalc_tooltip",
-                "Auto-detect target JAR and Spring config from current project",
-                "Автоопределение целевого JAR и конфигурации Spring из текущего проекта");
+                "Auto-detect target JAR and N2O config path from current project",
+                "Автоопределение целевого JAR и пути к конфигурации N2O из текущего проекта");
         put("settings.run.log_levels_label", "Terminal Output Log Levels:", "Уровни логов в терминале:");
         put("settings.run.log_debug_tooltip",
                 "Output DEBUG and TRACE logs to terminal console",
@@ -455,11 +455,11 @@ public final class I18n {
                 "If the application is already running and you switch profiles, skip the time-consuming pre-run build and quickly launch the newly selected profile.",
                 "Если приложение уже работает и вы переключаете профиль, пропустить длительную предварительную сборку и сразу перезапустить выбранный профиль.");
         put("help.run.template",
-                "Template for launching the application in Terminal.\nPlaceholders:\n• {profile} — selected Spring profile name\n• {filePath} — path to configuration YAML\nExample:\njava -jar target/server.jar --spring.profiles.active={profile},auth-dev",
-                "Шаблон команды для запуска приложения в терминале.\nПодстановки:\n• {profile} — имя выбранного Spring-профиля\n• {filePath} — путь к YAML-конфигурации\nПример:\njava -jar target/server.jar --spring.profiles.active={profile},auth-dev");
+                "Template for launching the application in Terminal.\nPlaceholders:\n• {profile} — selected Spring profile name\n• {filePath} — path to configuration YAML\nExample:\njava -jar target/server.jar --n2o.config.path=src/main/resources/META-INF/conf --spring.profiles.active={profile},auth-dev",
+                "Шаблон команды для запуска приложения в терминале.\nПодстановки:\n• {profile} — имя выбранного Spring-профиля\n• {filePath} — путь к YAML-конфигурации\nПример:\njava -jar target/server.jar --n2o.config.path=src/main/resources/META-INF/conf --spring.profiles.active={profile},auth-dev");
         put("help.run.recalc",
-                "Scans project modules and automatically detects the target JAR file and Spring YAML configuration to generate the optimal command line.",
-                "Сканирует модули проекта и автоматически находит целевой JAR-файл и конфигурацию Spring YAML, формируя оптимальную команду.");
+                "Scans project modules and automatically detects the target JAR file and N2O config path to generate the optimal command line.",
+                "Сканирует модули проекта и автоматически находит целевой JAR-файл и путь к конфигурации N2O, формируя оптимальную команду.");
         put("help.run.log_levels",
                 "Filter log messages written to the terminal console by log severity (DEBUG, INFO, WARN, ERROR). All logs are still preserved in session.log.",
                 "Фильтрация сообщений, выводимых в консоль терминала, по уровням логирования (DEBUG, INFO, WARN, ERROR). Все логи сохраняются в session.log.");
