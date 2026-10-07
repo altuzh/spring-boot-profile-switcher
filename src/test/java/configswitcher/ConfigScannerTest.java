@@ -728,8 +728,6 @@ public class ConfigScannerTest {
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(""));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate("   "));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
-                "java -jar target/server.jar --debug --n2o.config.path=C:\\Users\\al\\projects\\bft\\co\\src\\main\\resources\\META-INF\\conf --spring.profiles.active={profile}"));
-        assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/server.jar --debug --config.path=C:\\Users\\al\\projects\\bft\\co\\src\\main\\resources\\META-INF\\conf --spring.profiles.active={profile}"));
         assertTrue(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/server.jar --debug"));
@@ -739,6 +737,8 @@ public class ConfigScannerTest {
                 "java -jar target/server.jar --debug --spring.profiles.active={profile},auth-dev"));
         assertFalse(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
                 "java -jar target/my-app.jar --spring.profiles.active={profile}"));
+        assertFalse(configswitcher.state.PluginSettingsState.isLegacyDefaultTemplate(
+                "java -jar target/server.jar --debug --n2o.config.path=C:\\Users\\al\\projects\\bft\\co\\src\\main\\resources\\META-INF\\conf --spring.profiles.active={profile},auth-dev"));
     }
 
     @Test

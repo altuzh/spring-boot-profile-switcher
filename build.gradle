@@ -196,7 +196,10 @@ tasks.named('assemble') {
 }
 
 tasks.register('deploy') {
-    dependsOn installToRunningIde
+    dependsOn clean, installToRunningIde
+}
+tasks.named('installToRunningIde') {
+    mustRunAfter clean
 }
 
 tasks.withType(JavaCompile).configureEach {

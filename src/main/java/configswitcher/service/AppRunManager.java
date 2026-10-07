@@ -1196,12 +1196,27 @@ public final class AppRunManager implements Disposable {
         return resolved;
     }
 
+    @Nullable
+    public static File resolveProjectDir(@Nullable Project project) {
+        if (project == null) return null;
+        if (project.getBasePath() != null && !project.getBasePath().isBlank()) {
+            return new File(project.getBasePath());
+        }
+        try {
+            com.intellij.openapi.vfs.VirtualFile vf = com.intellij.openapi.project.ProjectUtil.guessProjectDir(project);
+            if (vf != null) {
+                return new File(vf.getPath());
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
     @NotNull
     public static String calculateDefaultCommandTemplate(@Nullable Project project) {
-        if (project == null || project.getBasePath() == null) {
+        File projectDir = resolveProjectDir(project);
+        if (projectDir == null) {
             return "java -jar target/server.jar --debug --spring.profiles.active={profile},auth-dev";
         }
-        File projectDir = new File(project.getBasePath());
         String targetJar = findTargetJar(projectDir);
         String n2oConfigPath = findN2oConfigPath(projectDir);
 

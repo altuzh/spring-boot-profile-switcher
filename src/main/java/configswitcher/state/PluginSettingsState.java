@@ -90,13 +90,15 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
         if ("java -jar target/server.jar --debug".equals(trimmed)) return true;
         if ("java -jar target/server.jar --debug --spring.profiles.active={profile}".equals(trimmed)) return true;
         if ("java -jar target/server.jar --debug --spring.profiles.active={profile},auth-dev".equals(trimmed)) return true;
-        return template.contains("C:\\Users\\al\\projects\\bft\\co")
-                || template.contains("C:/Users/al/projects/bft/co");
+        return trimmed.contains("--config.path=");
     }
 
     public void ensureCommandTemplateCalculated(@NotNull Project project) {
         if (isLegacyDefaultTemplate(myState.runCommandTemplate)) {
-            myState.runCommandTemplate = configswitcher.service.AppRunManager.calculateDefaultCommandTemplate(project);
+            String calculated = configswitcher.service.AppRunManager.calculateDefaultCommandTemplate(project);
+            if (calculated != null && !calculated.isBlank()) {
+                myState.runCommandTemplate = calculated;
+            }
         }
     }
 
@@ -135,7 +137,10 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
         }
 
         if (project != null && isLegacyDefaultTemplate(myState.runCommandTemplate)) {
-            myState.runCommandTemplate = configswitcher.service.AppRunManager.calculateDefaultCommandTemplate(project);
+            String calculated = configswitcher.service.AppRunManager.calculateDefaultCommandTemplate(project);
+            if (calculated != null && !calculated.isBlank()) {
+                myState.runCommandTemplate = calculated;
+            }
         }
         if (myState.meshWebAddresses == null) {
             myState.meshWebAddresses = new ArrayList<>();
