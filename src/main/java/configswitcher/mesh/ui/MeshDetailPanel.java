@@ -672,6 +672,7 @@ public class MeshDetailPanel extends JPanel {
         addMetaRow("Operation Type", entry.getOperationType().getDisplayName());
         addMetaRow("Target Endpoint", entry.getEndpoint() != null ? entry.getEndpoint() : "-");
         addMetaRow("HTTP Status", entry.getHttpStatus() != null ? entry.getHttpStatus() : "-");
+        addMetaRow("Log Level", entry.getLogLevel());
         addMetaRow("Latency", entry.getFormattedDuration());
         addMetaRow("Response Size", entry.getFormattedSize());
         addMetaRow("Trace ID (x-b3-traceid)", entry.getTraceId() != null ? entry.getTraceId() : "-");

@@ -275,4 +275,44 @@ public class MeshOutputAnalyzerTest {
         assertNotNull(entry.getFormattedVariables());
         assertTrue(entry.getFormattedVariables().contains("555"));
     }
+
+    @Test
+    public void testDebugRestTemplateLogRecords() {
+        String req = "{\"timestamp\":\"2026-10-07T12:20:01.845+03:00\",\"threadName\":\"http-nio-50906-exec-4\",\"module\":\"org.springframework.web.client.RestTemplate\",\"service\":\"SERVICE_NAME_IS_UNDEFINED\",\"destination\":\"SERVICE_DESTINATION_IS_UNDEFINED\",\"level\":\"DEBUG\",\"traceId\":\"cb46cb8f5f7632a6\",\"spanId\":\"cb46cb8f5f7632a6\",\"message\":\"Writing [{variables={}, query=\\n            \\n                query InsurantSearch {\\n                  RV_findInRsInsurerReadView(\\n                    pageable: {page: 0, size: 10}\\n                    criteriaGroup:\\n                    {\\n                      operator: AND,\\n                      criteriaGroups:\\n                      [\\n                        {\\n                          operator: AND,\\n                          criteriaGroups:\\n                          [\\n                            {\\n            operator: AND,\\n            criteriaSet: { field: insurer_singleRegNumber, operation: EQUALS, value: \\\"1000904167\\\" }\\n            }\\n                          ]\\n                        }\\n                      ]\\n                    }\\n                  ) {\\n                    data {\\n                      id\\n                      singleRegNumber\\n                    }\\n                    total_count\\n                  }\\n                }\\n            \\n        }] as \\\"application/json\\\"\",\"context\":{\"tracingContext\":{\"traceId\":\"cb46cb8f5f7632a6\",\"spanId\":\"cb46cb8f5f7632a6\"},\"authContext\":{\"userId\":\"eec9d22d-6124-4e97-9e88-17f2d2a956d3\"}}}";
+        String resp = "{\"timestamp\":\"2026-10-07T12:20:02.103+03:00\",\"threadName\":\"http-nio-50906-exec-4\",\"module\":\"org.springframework.web.client.RestTemplate\",\"service\":\"SERVICE_NAME_IS_UNDEFINED\",\"destination\":\"SERVICE_DESTINATION_IS_UNDEFINED\",\"level\":\"DEBUG\",\"traceId\":\"cb46cb8f5f7632a6\",\"spanId\":\"cb46cb8f5f7632a6\",\"message\":\"Response 200 OK\",\"context\":{\"tracingContext\":{\"traceId\":\"cb46cb8f5f7632a6\",\"spanId\":\"cb46cb8f5f7632a6\"},\"authContext\":{\"userId\":\"eec9d22d-6124-4e97-9e88-17f2d2a956d3\"}}}";
+
+        analyzer.processLine(req);
+        analyzer.processLine(resp);
+
+        List<MeshRequestEntry> entries = captureService.getEntries();
+        assertEquals(1, entries.size(), "Should capture exactly 1 request");
+        MeshRequestEntry entry = entries.get(0);
+
+        System.out.println("Entry log level: " + entry.getLogLevel());
+        System.out.println("Entry status: " + entry.getStatus());
+        System.out.println("Entry duration: " + entry.getDurationMs());
+        System.out.println("Entry operation: " + entry.getOperationName());
+
+        assertEquals("DEBUG", entry.getLogLevel(), "Entry log level should be DEBUG");
+        assertEquals("InsurantSearch", entry.getOperationName());
+        assertEquals("200 OK", entry.getHttpStatus());
+        assertEquals(MeshRequestStatus.SUCCESS, entry.getStatus());
+        assertEquals(258L, entry.getDurationMs());
+
+        // Verify table model reflects Level column and DEBUG filter
+        MeshRequestTableModel model = new MeshRequestTableModel();
+        model.addEntry(entry);
+        assertEquals(7, model.getColumnCount(), "Table must have 7 columns");
+        assertEquals("Level", model.getColumnName(2), "Column 2 should be Level");
+        assertEquals("DEBUG", model.getValueAt(0, 2), "Row 0 Column 2 should be DEBUG");
+
+        model.setLevelFilter("DEBUG");
+        assertEquals(1, model.getRowCount(), "DEBUG filter must match DEBUG entry");
+
+        model.setLevelFilter("INFO");
+        assertEquals(0, model.getRowCount(), "INFO filter must not match DEBUG entry");
+
+        model.setLevelFilter("All Levels");
+        assertEquals(1, model.getRowCount(), "All Levels filter must match DEBUG entry");
+    }
 }

@@ -332,11 +332,16 @@ public class MeshErrorClassificationTest {
         errorEntry.setLogLevel("ERROR");
         errorEntry.setStatus(MeshRequestStatus.ERROR);
 
+        MeshRequestEntry debugEntry = new MeshRequestEntry(4, "12:00:03", 1000L);
+        debugEntry.setLogLevel("DEBUG");
+        debugEntry.setStatus(MeshRequestStatus.SUCCESS);
+
         model.addEntry(infoEntry);
         model.addEntry(warnEntry);
         model.addEntry(errorEntry);
+        model.addEntry(debugEntry);
 
-        assertEquals(3, model.getRowCount());
+        assertEquals(4, model.getRowCount());
 
         model.setLevelFilter("ERROR");
         assertEquals(1, model.getRowCount());
@@ -350,8 +355,12 @@ public class MeshErrorClassificationTest {
         assertEquals(1, model.getRowCount());
         assertEquals(1, model.getEntryAt(0).getId());
 
+        model.setLevelFilter("DEBUG");
+        assertEquals(1, model.getRowCount());
+        assertEquals(4, model.getEntryAt(0).getId());
+
         model.setLevelFilter("All Levels");
-        assertEquals(3, model.getRowCount());
+        assertEquals(4, model.getRowCount());
     }
 
     @Test
@@ -464,14 +473,14 @@ public class MeshErrorClassificationTest {
     @Test
     public void testTableColumnsDoNotIncludeLatency() {
         MeshRequestTableModel model = new MeshRequestTableModel();
-        assertEquals(6, model.getColumnCount(), "Table model must have exactly 6 columns");
+        assertEquals(7, model.getColumnCount(), "Table model must have exactly 7 columns");
 
         List<String> colNames = new ArrayList<>();
         for (int i = 0; i < model.getColumnCount(); i++) {
             colNames.add(model.getColumnName(i));
         }
 
-        assertEquals(List.of("#", "Time", "Status", "HTTP", "Type", "Operation"), colNames);
+        assertEquals(List.of("#", "Time", "Level", "Status", "HTTP", "Type", "Operation"), colNames);
         assertFalse(colNames.contains("Latency"), "Table columns must not contain Latency");
     }
 

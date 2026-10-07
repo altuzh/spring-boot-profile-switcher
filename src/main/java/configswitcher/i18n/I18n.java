@@ -297,6 +297,7 @@ public final class I18n {
         // Table column headers
         put("mesh.table.col.num", "#", "#");
         put("mesh.table.col.time", "Time", "Время");
+        put("mesh.table.col.level", "Level", "Уровень");
         put("mesh.table.col.status", "Status", "Статус");
         put("mesh.table.col.http", "HTTP", "HTTP");
         put("mesh.table.col.type", "Type", "Тип");

@@ -15,6 +15,7 @@ public class MeshRequestTableModel extends AbstractTableModel {
     private static final String[] COLUMN_NAMES = {
             "#",
             "Time",
+            "Level",
             "Status",
             "HTTP",
             "Type",
@@ -23,6 +24,7 @@ public class MeshRequestTableModel extends AbstractTableModel {
 
     private static final Class<?>[] COLUMN_CLASSES = {
             Integer.class,
+            String.class,
             String.class,
             Object.class,
             String.class,
@@ -33,6 +35,7 @@ public class MeshRequestTableModel extends AbstractTableModel {
     private static final String[] COLUMN_I18N_KEYS = {
             "mesh.table.col.num",
             "mesh.table.col.time",
+            "mesh.table.col.level",
             "mesh.table.col.status",
             "mesh.table.col.http",
             "mesh.table.col.type",
@@ -91,10 +94,11 @@ public class MeshRequestTableModel extends AbstractTableModel {
         return switch (columnIndex) {
             case 0 -> entry.getId();
             case 1 -> entry.getFormattedTime();
-            case 2 -> entry; // Pass whole entry for status & error badge renderer
-            case 3 -> entry.getHttpStatus() != null ? entry.getHttpStatus() : "-";
-            case 4 -> entry.getOperationType().getDisplayName();
-            case 5 -> entry.getDisplayOperation();
+            case 2 -> entry.getLogLevel();
+            case 3 -> entry; // Pass whole entry for status & error badge renderer
+            case 4 -> entry.getHttpStatus() != null ? entry.getHttpStatus() : "-";
+            case 5 -> entry.getOperationType().getDisplayName();
+            case 6 -> entry.getDisplayOperation();
             default -> null;
         };
     }
@@ -241,8 +245,15 @@ public class MeshRequestTableModel extends AbstractTableModel {
     }
 
     private boolean matches(MeshRequestEntry entry) {
-        if (levelFilter != null && !levelFilter.equalsIgnoreCase(entry.getLogLevel())) {
-            return false;
+        if (levelFilter != null) {
+            String entryLevel = entry.getLogLevel();
+            if ("DEBUG".equalsIgnoreCase(levelFilter)) {
+                if (!"DEBUG".equalsIgnoreCase(entryLevel) && !"TRACE".equalsIgnoreCase(entryLevel)) {
+                    return false;
+                }
+            } else if (!levelFilter.equalsIgnoreCase(entryLevel)) {
+                return false;
+            }
         }
         if (typeFilter != null && entry.getOperationType() != typeFilter) {
             return false;

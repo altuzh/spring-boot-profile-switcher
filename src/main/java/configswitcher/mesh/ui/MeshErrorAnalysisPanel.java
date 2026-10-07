@@ -187,22 +187,44 @@ public class MeshErrorAnalysisPanel extends JPanel implements MeshCaptureService
         errorTable.setAutoResizeMode(JBTable.AUTO_RESIZE_LAST_COLUMN);
         errorTable.setStriped(true);
 
-        if (errorTable.getColumnModel().getColumnCount() >= 6) {
+        if (errorTable.getColumnModel().getColumnCount() >= 7) {
             errorTable.getColumnModel().getColumn(0).setPreferredWidth(45);
             errorTable.getColumnModel().getColumn(0).setMaxWidth(60);
             errorTable.getColumnModel().getColumn(1).setPreferredWidth(75);
             errorTable.getColumnModel().getColumn(1).setMaxWidth(90);
-            errorTable.getColumnModel().getColumn(2).setPreferredWidth(95); // Status / Error badge
-            errorTable.getColumnModel().getColumn(2).setMaxWidth(115);
-            errorTable.getColumnModel().getColumn(3).setPreferredWidth(80);
-            errorTable.getColumnModel().getColumn(3).setMaxWidth(100);
-            errorTable.getColumnModel().getColumn(4).setPreferredWidth(75);
-            errorTable.getColumnModel().getColumn(4).setMaxWidth(90);
-            errorTable.getColumnModel().getColumn(5).setPreferredWidth(220); // Operation
+            errorTable.getColumnModel().getColumn(2).setPreferredWidth(60); // Level
+            errorTable.getColumnModel().getColumn(2).setMaxWidth(75);
+            errorTable.getColumnModel().getColumn(3).setPreferredWidth(95); // Status / Error badge
+            errorTable.getColumnModel().getColumn(3).setMaxWidth(115);
+            errorTable.getColumnModel().getColumn(4).setPreferredWidth(80);
+            errorTable.getColumnModel().getColumn(4).setMaxWidth(100);
+            errorTable.getColumnModel().getColumn(5).setPreferredWidth(75);
+            errorTable.getColumnModel().getColumn(5).setMaxWidth(90);
+            errorTable.getColumnModel().getColumn(6).setPreferredWidth(220); // Operation
         }
 
-        // Custom Cell Renderer for error badge
+        // Custom Cell Renderer for Level column
         errorTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(javax.swing.JTable t, Object val, boolean isSelected, boolean hasFocus, int row, int col) {
+                Component c = super.getTableCellRendererComponent(t, val, isSelected, hasFocus, row, col);
+                if (val instanceof String lvl) {
+                    setText(lvl);
+                    if (!isSelected) {
+                        switch (lvl.toUpperCase()) {
+                            case "ERROR" -> setForeground(JBColor.RED);
+                            case "WARN", "WARNING" -> setForeground(new JBColor(new java.awt.Color(204, 102, 0), new java.awt.Color(245, 166, 35)));
+                            case "DEBUG", "TRACE" -> setForeground(JBColor.GRAY);
+                            default -> setForeground(JBColor.foreground());
+                        }
+                    }
+                }
+                return c;
+            }
+        });
+
+        // Custom Cell Renderer for error badge
+        errorTable.getColumnModel().getColumn(3).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(javax.swing.JTable t, Object val, boolean isSelected, boolean hasFocus, int row, int col) {
                 Component c = super.getTableCellRendererComponent(t, val, isSelected, hasFocus, row, col);

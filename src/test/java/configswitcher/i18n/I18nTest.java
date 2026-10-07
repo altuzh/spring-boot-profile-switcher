@@ -192,6 +192,7 @@ public class I18nTest {
                 "mesh.error.empty_folder_btn",
                 "mesh.table.col.num",
                 "mesh.table.col.time",
+                "mesh.table.col.level",
                 "mesh.table.col.status",
                 "mesh.table.col.http",
                 "mesh.table.col.type",

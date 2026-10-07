@@ -231,6 +231,7 @@ public class MeshOutputAnalyzer {
             entry.setPid(pid);
             entry.setThreadName(thread);
             entry.setUserId(userId);
+            entry.setLogLevel(level);
             entry.addRawLogLine(fullLine);
 
             entry.setRawQuery(initialQuery);
@@ -294,6 +295,7 @@ public class MeshOutputAnalyzer {
                 entry.setPid(pid);
                 entry.setThreadName(thread);
                 entry.setUserId(userId);
+                entry.setLogLevel(level);
                 entry.addRawLogLine(fullLine);
 
                 parseWritingJsonPayload(entry, message);
@@ -315,18 +317,41 @@ public class MeshOutputAnalyzer {
                 pending.setHttpStatus(httpStatus);
                 pending.addRawLogLine(fullLine);
 
+                long duration = epochMillis - pending.getEpochMillis();
+                if (duration >= 0) {
+                    pending.setDurationMs(duration);
+                }
+
+                if (pending.getFormattedQuery() == null && pending.getRawQuery() != null) {
+                    pending.setFormattedQuery(GraphQLFormatter.format(pending.getRawQuery()));
+                    if (pending.getOperationName() == null) {
+                        pending.setOperationName(GraphQLFormatter.extractOperationName(pending.getRawQuery()));
+                    }
+                    if (pending.getRootField() == null) {
+                        pending.setRootField(GraphQLFormatter.extractRootField(pending.getRawQuery()));
+                    }
+                }
+
                 if (code.startsWith("5")) {
                     pending.setStatus(MeshRequestStatus.ERROR);
                     pending.setErrorType(configswitcher.mesh.model.MeshErrorType.HTTP_5XX);
                     pending.setErrorCode(code);
                     pending.setRootCauseMessage("HTTP Server Error: " + httpStatus);
                     pending.setErrorMessage("HTTP Error: " + httpStatus);
+                    pending.setLogLevel("ERROR");
                 } else if (code.startsWith("4")) {
                     pending.setStatus(MeshRequestStatus.ERROR);
                     pending.setErrorType(configswitcher.mesh.model.MeshErrorType.HTTP_4XX);
                     pending.setErrorCode(code);
                     pending.setRootCauseMessage("HTTP Client Error: " + httpStatus);
                     pending.setErrorMessage("HTTP Error: " + httpStatus);
+                    if (!"ERROR".equalsIgnoreCase(pending.getLogLevel())) {
+                        pending.setLogLevel("WARN");
+                    }
+                } else if (code.startsWith("2")) {
+                    if (pending.getStatus() == MeshRequestStatus.PENDING) {
+                        pending.setStatus(MeshRequestStatus.SUCCESS);
+                    }
                 }
                 captureService.onEntryUpdated(pending);
             }
