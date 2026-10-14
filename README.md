@@ -1,7 +1,7 @@
 # Spring Boot Profile Switcher — Плагин для IntelliJ IDEA
 
 [![IntelliJ Platform](https://img.shields.io/badge/IntelliJ%20Platform-2022.2%2B%20%7C%202024.x%2B%20%7C%202026.x%2B-blue.svg)](https://plugins.jetbrains.com/)
-[![Version](https://img.shields.io/badge/Version-1.0.25-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.0.26-brightgreen.svg)]()
 
 **Spring Boot Profile Switcher** — плагин для среды разработки IntelliJ IDEA, созданный для удобного управления конфигурационными профилями и запуска приложений на **Spring Boot (2.x – 3.x)**.
 
@@ -60,14 +60,14 @@
 
 ## Установка плагина в IDE
 
-1. Загрузите архив плагина `spring-boot-profile-switcher-1.0.25.zip` (из раздела релизов).
+1. Загрузите архив плагина `spring-boot-profile-switcher-1.0.26.zip` (из раздела релизов).
 2. Запустите **IntelliJ IDEA**.
 3. Откройте окно настроек:
    - В Windows/Linux: **File ➔ Settings...** (или нажмите `Ctrl + Alt + S`).
    - В macOS: **IntelliJ IDEA ➔ Settings...** (или нажмите `Cmd + ,`).
 4. В левом меню выберите раздел **Plugins** (Плагины).
 5. В верхней части панели нажмите на значок шестерёнки (**⚙**) и выберите пункт **Install Plugin from Disk...** (Установить плагин с диска...).
-6. В открывшемся файловом проводнике выберите файл `spring-boot-profile-switcher-1.0.25.zip` и нажмите **OK**.
+6. В открывшемся файловом проводнике выберите файл `spring-boot-profile-switcher-1.0.26.zip` и нажмите **OK**.
 7. Нажмите **Apply** (Применить), затем **Restart IDE** (Перезагрузить среду) для завершения установки.
 
 ---
@@ -201,7 +201,7 @@
 - Предотвращает ошибки переполнения URL (Nginx 414 Request-URI Too Large) путем прозрачной трансформации параметров запроса.
 
 #### Установка расширения в Google Chrome:
-1. Загрузите архив `chrome-mesh-extension-1.0.25.zip` из раздела релизов (Releases) или используйте каталог `chrome-mesh-extension` из репозитория.
+1. Загрузите архив `chrome-mesh-extension-1.0.26.zip` из раздела релизов (Releases) или используйте каталог `chrome-mesh-extension` из репозитория.
 2. Распакуйте архив в удобную папку.
 3. Откройте страницу `chrome://extensions` в браузере.
 4. Включите переключатель **Режим разработчика** (**Developer mode**).

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'configswitcher'
-version = '1.0.25'
+version = '1.0.26'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -89,18 +89,18 @@ tasks.register('installToRunningIde') {
             return
         }
 
-        def ideRootDirs = [new File(appData, 'JetBrains'), new File(appData, 'OpenIDE')].findAll { it.exists() }
+        def ideRootDirs = [new File(appData, 'JetBrains'), new File(appData, 'OpenIDE'), new File(appData, 'GIGAIDE'), new File(appData, 'Google')].findAll { it.exists() }
         if (ideRootDirs.isEmpty()) {
-            println "[Local Install] Neither JetBrains nor OpenIDE directory found in APPDATA, skipping."
+            println "[Local Install] No IDE directories found in APPDATA, skipping."
             return
         }
 
-        // Detect running JetBrains / OpenIDE processes
+        // Detect running JetBrains / OpenIDE / IntelliJ-platform processes
         def runningProcesses = []
         try {
             ProcessHandle.allProcesses().each { ph ->
                 def cmd = ph.info().command().orElse('').toLowerCase()
-                if (cmd.contains('idea64') || cmd.contains('idea.exe') || cmd.contains('webstorm') || cmd.contains('openide')) {
+                if (cmd.contains('idea64') || cmd.contains('idea.exe') || cmd.contains('webstorm') || cmd.contains('pycharm') || cmd.contains('openide') || cmd.contains('studio64')) {
                     def name = cmd.substring(Math.max(0, Math.max(cmd.lastIndexOf('/'), cmd.lastIndexOf('\\')) + 1))
                     runningProcesses.add(name)
                 }
@@ -110,7 +110,7 @@ tasks.register('installToRunningIde') {
         if (!runningProcesses.isEmpty()) {
             println "[Local Install] Detected running IDE: ${runningProcesses.unique().join(', ')}"
         } else {
-            println "[Local Install] No running IDE detected; installing to installed JetBrains / OpenIDE directories."
+            println "[Local Install] No running IDE detected; installing to installed IDE directories."
         }
 
         def jarFile = jarProvider.get().asFile
@@ -118,7 +118,7 @@ tasks.register('installToRunningIde') {
 
         ideRootDirs.each { rootDir ->
             rootDir.listFiles()?.each { ideDir ->
-                if (ideDir.isDirectory() && (ideDir.name.contains('Idea') || ideDir.name.contains('WebStorm') || ideDir.name.contains('PyCharm') || ideDir.name.contains('OpenIDE'))) {
+                if (ideDir.isDirectory() && (ideDir.name.contains('Idea') || ideDir.name.contains('WebStorm') || ideDir.name.contains('PyCharm') || ideDir.name.contains('OpenIDE') || ideDir.name.contains('GIGAIDE') || ideDir.name.contains('AndroidStudio'))) {
                     // Remove legacy plugin directories with obsolete names
                     ['config-switcher', 'n2o-profile-switcher', 'idea-config-switcher'].each { legacyName ->
                         def legacyDir = new File(ideDir, "plugins/${legacyName}")
@@ -133,7 +133,7 @@ tasks.register('installToRunningIde') {
                     }
 
                     def pluginLib = new File(ideDir, "plugins/spring-boot-profile-switcher/lib")
-                    if (pluginLib.exists() || new File(ideDir, "plugins").exists()) {
+                    if (pluginLib.exists() || new File(ideDir, "plugins").exists() || new File(ideDir, "options").exists()) {
                         if (!pluginLib.exists()) {
                             pluginLib.mkdirs()
                         }
