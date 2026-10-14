@@ -144,11 +144,12 @@ public final class MeshCaptureService implements Disposable {
         if (a.getId() == b.getId()) {
             return true;
         }
-        if (a.getTraceId() != null && !a.getTraceId().isBlank() &&
-                b.getTraceId() != null && !b.getTraceId().isBlank()) {
-            return a.getTraceId().equals(b.getTraceId());
-        }
         if (isSameTimestamp(a, b)) {
+            if (a.getTraceId() != null && !a.getTraceId().isBlank() &&
+                    b.getTraceId() != null && !b.getTraceId().isBlank() &&
+                    !a.getTraceId().equals(b.getTraceId())) {
+                return false;
+            }
             if (a.getThreadName() != null && b.getThreadName() != null && !a.getThreadName().equals(b.getThreadName())) {
                 return false;
             }

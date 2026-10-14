@@ -260,6 +260,24 @@ public class MeshDeduplicationTest {
     }
 
     @Test
+    public void testDifferentMeshCallsInSameTraceArePreserved() {
+        MeshRequestEntry first = new MeshRequestEntry(1, "2026-09-27 20:42:37.100", 1000L);
+        first.setTraceId("shared-trace");
+        first.setOperationName("Query1");
+
+        MeshRequestEntry second = new MeshRequestEntry(2, "2026-09-27 20:42:37.200", 1100L);
+        second.setTraceId("shared-trace");
+        second.setOperationName("Query2");
+
+        captureService.onEntryCreated(first);
+        captureService.onEntryCreated(second);
+
+        assertEquals(2, captureService.getEntries().size(),
+                "Different Mesh calls in the same trace must be shown as separate records");
+        assertEquals(2, tableModel.getRowCount());
+    }
+
+    @Test
     public void testMaxHistoryDeletesOldestAndRecordsNewest() {
         java.util.List<MeshRequestEntry> removedList = new java.util.ArrayList<>();
         captureService.addListener(new MeshCaptureService.MeshCaptureListener() {
