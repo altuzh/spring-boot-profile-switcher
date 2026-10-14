@@ -222,4 +222,107 @@ public class MeshDeduplicationTest {
         String preserved = configswitcher.mesh.ui.MeshDetailPanel.buildMeshBrowserUrl(fullExampleUrl, null);
         assertEquals(fullExampleUrl, preserved);
     }
+
+    @Test
+    public void testSequentialRestTemplateRequestsOnSameThreadAreCapturedSeparately() {
+        String[] req1 = {
+                "2026-10-14 19:15:20.000 DEBUG [app,trc1,spn1] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : HTTP POST http://mesh-java.uat.ecp/graphql",
+                "2026-10-14 19:15:20.010 DEBUG [app,trc1,spn1] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : Writing [{variables={}, query=query GetUserInfo { user { id } }}] as \"application/json\"",
+                "2026-10-14 19:15:20.080 DEBUG [app,trc1,spn1] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : Response 200 OK"
+        };
+
+        String[] req2 = {
+                "2026-10-14 19:15:25.000 DEBUG [app,trc2,spn2] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : HTTP POST http://mesh-java.uat.ecp/graphql",
+                "2026-10-14 19:15:25.010 DEBUG [app,trc2,spn2] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : Writing [{variables={}, query=query GetOrderInfo { order { id } }}] as \"application/json\"",
+                "2026-10-14 19:15:25.090 DEBUG [app,trc2,spn2] 100 --- [http-nio-50906-exec-3] o.s.web.client.RestTemplate : Response 200 OK"
+        };
+
+        for (String line : req1) {
+            analyzer.processLine(line);
+        }
+        for (String line : req2) {
+            analyzer.processLine(line);
+        }
+
+        List<MeshRequestEntry> entries = captureService.getEntries();
+        assertEquals(2, entries.size(), "Both sequential requests on the same thread must be captured");
+        assertEquals(2, tableModel.getRowCount(), "Table model must contain both requests");
+
+        MeshRequestEntry entry1 = entries.get(0);
+        assertEquals("GetUserInfo", entry1.getOperationName());
+        assertEquals("trc1", entry1.getTraceId());
+        assertEquals(MeshRequestStatus.SUCCESS, entry1.getStatus());
+
+        MeshRequestEntry entry2 = entries.get(1);
+        assertEquals("GetOrderInfo", entry2.getOperationName());
+        assertEquals("trc2", entry2.getTraceId());
+        assertEquals(MeshRequestStatus.SUCCESS, entry2.getStatus());
+    }
+
+    @Test
+    public void testMaxHistoryDeletesOldestAndRecordsNewest() {
+        java.util.List<MeshRequestEntry> removedList = new java.util.ArrayList<>();
+        captureService.addListener(new MeshCaptureService.MeshCaptureListener() {
+            @Override
+            public void onEntryAdded(MeshRequestEntry entry) {}
+            @Override
+            public void onEntryUpdated(MeshRequestEntry entry) {}
+            @Override
+            public void onEntryRemoved(MeshRequestEntry entry) {
+                removedList.add(entry);
+                tableModel.removeEntry(entry);
+            }
+            @Override
+            public void onCleared() {}
+        });
+
+        int limit = 500;
+        int totalToInsert = 520;
+        for (int i = 1; i <= totalToInsert; i++) {
+            String ts = String.format("2026-10-14 10:00:%02d.%03d", i / 1000, i % 1000);
+            MeshRequestEntry e = new MeshRequestEntry(i, ts, 10000L + i);
+            e.setOperationName("Op_" + i);
+            captureService.onEntryCreated(e);
+        }
+
+        assertEquals(limit, captureService.getEntries().size(), "CaptureService must cap at maxHistory");
+        assertEquals(limit, tableModel.getRowCount(), "TableModel must cap at maxHistory");
+        assertEquals(20, removedList.size(), "20 oldest records should have triggered onEntryRemoved");
+
+        // Oldest (1..20) must be removed
+        assertEquals("Op_21", captureService.getEntries().get(0).getOperationName());
+        assertEquals("Op_520", captureService.getEntries().get(limit - 1).getOperationName());
+        assertEquals("Op_21", tableModel.getEntryAt(0).getOperationName());
+        assertEquals("Op_520", tableModel.getEntryAt(limit - 1).getOperationName());
+    }
+
+    @Test
+    public void testUserJsonLogsCheckDoesNotHaltRecording() {
+        String jsonLineTemplate = "{\"timestamp\":\"2026-10-14T19:15:21.%03d+03:00\",\"threadName\":\"http-nio-50906-exec-3\"," +
+                "\"module\":\"org.springframework.boot.context.properties.source.ConfigurationPropertySourcesPropertyResolver$DefaultResolver\"," +
+                "\"service\":\"SERVICE_NAME_IS_UNDEFINED\",\"destination\":\"SERVICE_DESTINATION_IS_UNDEFINED\",\"level\":\"DEBUG\"," +
+                "\"traceId\":\"edcdb56a48b88e26\",\"spanId\":\"edcdb56a48b88e26\"," +
+                "\"message\":\"Found key 'n2o.config.field.forbidden_ids' in PropertySource 'n2oProperties' with value of type String\"," +
+                "\"context\":{\"businessContext\":null,\"tracingContext\":{\"traceId\":\"edcdb56a48b88e26\",\"spanId\":\"edcdb56a48b88e26\",\"parentSpanId\":null}," +
+                "\"authContext\":{\"userId\":\"eec9d22d-6124-4e97-9e88-17f2d2a956d3\",\"requestSource\":null,\"sourceProtocol\":null}," +
+                "\"txContext\":null,\"uiTaskContext\":null,\"userTaskContext\":null,\"customContexts\":{}},\"index\":\"ecp-null-debug\"}";
+
+        for (int i = 0; i < 20; i++) {
+            analyzer.processLine(String.format(jsonLineTemplate, i));
+        }
+
+        // Now an actual GraphQL request arrives on the same thread
+        analyzer.processLine("{\"timestamp\":\"2026-10-14T19:15:22.000+03:00\",\"threadName\":\"http-nio-50906-exec-3\",\"level\":\"DEBUG\"," +
+                "\"traceId\":\"edcdb56a48b88e26\",\"spanId\":\"edcdb56a48b88e26\",\"message\":\"HTTP POST http://mesh-java.uat.ecp/graphql\"}");
+        analyzer.processLine("{\"timestamp\":\"2026-10-14T19:15:22.010+03:00\",\"threadName\":\"http-nio-50906-exec-3\",\"level\":\"DEBUG\"," +
+                "\"traceId\":\"edcdb56a48b88e26\",\"spanId\":\"edcdb56a48b88e26\",\"message\":\"Writing [{variables={}, query=query UserCheck { id }}] as \\\"application/json\\\"\"}");
+        analyzer.processLine("{\"timestamp\":\"2026-10-14T19:15:22.080+03:00\",\"threadName\":\"http-nio-50906-exec-3\",\"level\":\"DEBUG\"," +
+                "\"traceId\":\"edcdb56a48b88e26\",\"spanId\":\"edcdb56a48b88e26\",\"message\":\"Response 200 OK\"}");
+
+        assertEquals(1, captureService.getEntries().size());
+        MeshRequestEntry entry = captureService.getEntries().get(0);
+        assertEquals("UserCheck", entry.getOperationName());
+        assertEquals("http-nio-50906-exec-3", entry.getThreadName());
+        assertEquals(MeshRequestStatus.SUCCESS, entry.getStatus());
+    }
 }

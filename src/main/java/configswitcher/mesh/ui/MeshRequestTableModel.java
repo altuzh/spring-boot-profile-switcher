@@ -110,32 +110,57 @@ public class MeshRequestTableModel extends AbstractTableModel {
         return null;
     }
 
+    public int getMaxHistory() {
+        if (project != null) {
+            try {
+                int max = configswitcher.state.PluginSettingsState.getInstance(project).getState().meshMaxHistory;
+                if (max > 0) return max;
+            } catch (Throwable ignored) {}
+        }
+        return 500;
+    }
+
     public synchronized void setEntries(@NotNull List<MeshRequestEntry> newEntries) {
         allEntries.clear();
-        java.util.Set<String> seenTimestamps = new java.util.HashSet<>();
-        java.util.Set<Integer> seenIds = new java.util.HashSet<>();
+        int maxHistory = getMaxHistory();
         for (MeshRequestEntry entry : newEntries) {
-            String ts = entry.getTimestamp();
-            if (ts != null && !seenTimestamps.add(ts)) {
-                continue;
+            boolean duplicate = false;
+            for (MeshRequestEntry existing : allEntries) {
+                if (existing.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(existing, entry)) {
+                    duplicate = true;
+                    break;
+                }
             }
-            if (!seenIds.add(entry.getId())) {
-                continue;
+            if (!duplicate) {
+                if (allEntries.size() >= maxHistory && !allEntries.isEmpty()) {
+                    allEntries.remove(0);
+                }
+                allEntries.add(entry);
             }
-            allEntries.add(entry);
         }
         applyFilter();
     }
 
     public synchronized void addEntry(@NotNull MeshRequestEntry entry) {
-        // Enforce uniqueness by timestamp and id
+        // Enforce uniqueness by id or smart entry matching
         for (int i = 0; i < allEntries.size(); i++) {
             MeshRequestEntry existing = allEntries.get(i);
-            if (existing.getId() == entry.getId() ||
-                    (existing.getTimestamp() != null && existing.getTimestamp().equals(entry.getTimestamp()))) {
+            if (existing.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(existing, entry)) {
                 allEntries.set(i, entry);
                 updateFilteredEntry(entry);
                 return;
+            }
+        }
+
+        int maxHistory = getMaxHistory();
+        while (allEntries.size() >= maxHistory && !allEntries.isEmpty()) {
+            MeshRequestEntry oldest = allEntries.remove(0);
+            for (int i = 0; i < filteredEntries.size(); i++) {
+                if (filteredEntries.get(i).getId() == oldest.getId()) {
+                    filteredEntries.remove(i);
+                    fireTableRowsDeleted(i, i);
+                    break;
+                }
             }
         }
 
@@ -147,11 +172,22 @@ public class MeshRequestTableModel extends AbstractTableModel {
         }
     }
 
+    public synchronized void removeEntry(@NotNull MeshRequestEntry entry) {
+        allEntries.removeIf(e -> e.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(e, entry));
+        for (int i = 0; i < filteredEntries.size(); i++) {
+            MeshRequestEntry fe = filteredEntries.get(i);
+            if (fe.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(fe, entry)) {
+                filteredEntries.remove(i);
+                fireTableRowsDeleted(i, i);
+                break;
+            }
+        }
+    }
+
     private void updateFilteredEntry(@NotNull MeshRequestEntry entry) {
         for (int i = 0; i < filteredEntries.size(); i++) {
             MeshRequestEntry existing = filteredEntries.get(i);
-            if (existing.getId() == entry.getId() ||
-                    (existing.getTimestamp() != null && existing.getTimestamp().equals(entry.getTimestamp()))) {
+            if (existing.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(existing, entry)) {
                 if (matches(entry)) {
                     filteredEntries.set(i, entry);
                     fireTableRowsUpdated(i, i);
@@ -175,8 +211,7 @@ public class MeshRequestTableModel extends AbstractTableModel {
         // Find in allEntries
         for (int i = 0; i < allEntries.size(); i++) {
             MeshRequestEntry existing = allEntries.get(i);
-            if (existing.getId() == entry.getId() ||
-                    (existing.getTimestamp() != null && existing.getTimestamp().equals(entry.getTimestamp()))) {
+            if (existing.getId() == entry.getId() || configswitcher.mesh.service.MeshCaptureService.isSameEntry(existing, entry)) {
                 allEntries.set(i, entry);
                 break;
             }

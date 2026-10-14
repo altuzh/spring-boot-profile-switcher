@@ -151,4 +151,25 @@ public class ConfigSwitcherLogTest {
         assertTrue(ConfigSwitcherLog.getCurrentExecutionLog(projA).isEmpty());
         assertTrue(ConfigSwitcherLog.getCurrentExecutionLog(projB).contains("Beta 1"));
     }
+
+    @Test
+    public void testBufferRotationWhenExceedingMaxCharsDeletesOldestLines() {
+        Project projA = createMockProject("RotationService", false);
+
+        // Write lines totaling ~350,000 chars (each line ~100 chars)
+        StringBuilder longPadding = new StringBuilder();
+        for (int i = 0; i < 80; i++) {
+            longPadding.append("x");
+        }
+        String padding = longPadding.toString();
+
+        for (int i = 1; i <= 3500; i++) {
+            ConfigSwitcherLog.info(projA, String.format("MARKER_LINE_%05d_%s", i, padding));
+        }
+
+        String log = ConfigSwitcherLog.getCurrentExecutionLog(projA);
+        assertTrue(log.length() <= 300_000, "Log buffer must not exceed MAX_BUFFER_CHARS");
+        assertFalse(log.contains("MARKER_LINE_00001_"), "Oldest lines must be deleted");
+        assertTrue(log.contains("MARKER_LINE_03500_"), "Newest lines must be recorded");
+    }
 }

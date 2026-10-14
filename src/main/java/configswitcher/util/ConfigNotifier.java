@@ -19,7 +19,7 @@ public class ConfigNotifier {
     }
 
     public static void notifyError(@Nullable Project project, String message) {
-        ConfigSwitcherLog.error(project, "NOTIFICATION [ERROR]: " + message);
+        ConfigSwitcherLog.warn(project, "NOTIFICATION [ERROR]: " + message);
         notify(project, message, NotificationType.ERROR);
     }
 

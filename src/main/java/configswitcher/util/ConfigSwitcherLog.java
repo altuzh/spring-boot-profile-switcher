@@ -152,22 +152,18 @@ public class ConfigSwitcherLog {
 
         String projKey = getProjectDirectoryName(project);
         StringBuilder projBuf = projectExecutionBuffers.computeIfAbsent(projKey, k -> new StringBuilder());
-        if (projBuf.length() < MAX_BUFFER_CHARS) {
-            projBuf.append(logLine);
-            if (throwable != null) {
-                StringWriter sw = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(sw));
-                projBuf.append(sw);
-            }
+        appendToBuffer(projBuf, logLine);
+        if (throwable != null) {
+            StringWriter sw = new StringWriter();
+            throwable.printStackTrace(new PrintWriter(sw));
+            appendToBuffer(projBuf, sw.toString());
         }
 
-        if (currentExecutionBuffer.length() < MAX_BUFFER_CHARS) {
-            currentExecutionBuffer.append(logLine);
-            if (throwable != null) {
-                StringWriter sw = new StringWriter();
-                throwable.printStackTrace(new PrintWriter(sw));
-                currentExecutionBuffer.append(sw);
-            }
+        appendToBuffer(currentExecutionBuffer, logLine);
+        if (throwable != null) {
+            StringWriter sw = new StringWriter();
+            throwable.printStackTrace(new PrintWriter(sw));
+            appendToBuffer(currentExecutionBuffer, sw.toString());
         }
 
         switch (level) {
@@ -256,6 +252,21 @@ public class ConfigSwitcherLog {
                 bw.flush();
             }
         } catch (Throwable ignored) {}
+    }
+
+    static void appendToBuffer(@NotNull StringBuilder buf, @NotNull String text) {
+        if (text.isEmpty()) return;
+        if (buf.length() + text.length() > MAX_BUFFER_CHARS) {
+            int overflow = (buf.length() + text.length()) - MAX_BUFFER_CHARS;
+            int cutIdx = Math.min(buf.length(), overflow);
+            int nextNewline = buf.indexOf("\n", cutIdx);
+            if (nextNewline >= 0 && nextNewline < buf.length()) {
+                buf.delete(0, nextNewline + 1);
+            } else {
+                buf.delete(0, cutIdx);
+            }
+        }
+        buf.append(text);
     }
 
     private static void rotateIfNeeded(@NotNull File logFile) {

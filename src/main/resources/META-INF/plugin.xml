@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>spring-boot-profile-switcher</id>
     <name>Spring Boot Profile Switcher</name>
-    <version>1.0.24</version>
+    <version>1.0.25</version>
     <vendor email="altuzh@users.noreply.github.com" url="https://github.com/altuzh/spring-boot-profile-switcher">Alexey Tuzhikov</vendor>
 
     <description><![CDATA[

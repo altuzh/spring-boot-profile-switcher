@@ -502,6 +502,19 @@ public class MeshInspectorPanel extends JPanel implements MeshCaptureService.Mes
     }
 
     @Override
+    public void onEntryRemoved(@NotNull MeshRequestEntry entry) {
+        tableModel.removeEntry(entry);
+        updateSummary();
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow >= 0) {
+            MeshRequestEntry current = tableModel.getEntryAt(selectedRow);
+            detailPanel.setEntry(current);
+        } else {
+            detailPanel.setEntry(null);
+        }
+    }
+
+    @Override
     public void onCleared() {
         tableModel.clear();
         detailPanel.setEntry(null);

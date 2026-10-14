@@ -210,9 +210,10 @@ public class MeshOutputAnalyzer {
         int execIdx = message.indexOf("Execute GraphQL query:");
         if (execIdx >= 0) {
             String initialQuery = message.substring(execIdx + "Execute GraphQL query:".length()).trim();
+            String opName = GraphQLFormatter.extractOperationName(initialQuery);
 
             // Check if record with this timestamp was already captured
-            MeshRequestEntry existing = captureService.findEntryByTimestamp(timestampStr);
+            MeshRequestEntry existing = captureService.findMatchingEntry(timestampStr, traceId, thread, opName);
             if (existing != null) {
                 if (traceId != null) {
                     pendingByTrace.put(traceId, existing);
@@ -236,7 +237,7 @@ public class MeshOutputAnalyzer {
 
             entry.setRawQuery(initialQuery);
             entry.setOperationType(MeshOperationType.fromQueryText(initialQuery));
-            entry.setOperationName(GraphQLFormatter.extractOperationName(initialQuery));
+            entry.setOperationName(opName);
             entry.setRootField(GraphQLFormatter.extractRootField(initialQuery));
 
             if (traceId != null) {
@@ -261,10 +262,37 @@ public class MeshOutputAnalyzer {
         Matcher httpPostMatcher = HTTP_POST_PATTERN.matcher(message);
         if (httpPostMatcher.find()) {
             String url = httpPostMatcher.group("url");
-            if (pending != null) {
+            if (pending != null && pending.getEndpoint() == null && pending.getHttpStatus() == null && pending.getRawResponse() == null) {
                 pending.setEndpoint(url);
                 pending.addRawLogLine(fullLine);
                 captureService.onEntryUpdated(pending);
+            } else {
+                if (pending != null) {
+                    cleanupPendingEntry(pending);
+                }
+                if (url != null && (url.contains("/graphql") || url.contains("/query") || url.toLowerCase().contains("mesh"))) {
+                    MeshRequestEntry existing = captureService.findMatchingEntry(timestampStr, traceId, thread, null);
+                    if (existing != null) {
+                        if (traceId != null) pendingByTrace.put(traceId, existing);
+                        if (thread != null) pendingByThread.put(thread, existing);
+                        return;
+                    }
+                    MeshRequestEntry entry = new MeshRequestEntry(sequenceCounter.incrementAndGet(), timestampStr, epochMillis);
+                    entry.setAppName(app);
+                    entry.setTraceId(traceId);
+                    entry.setSpanId(spanId);
+                    entry.setPid(pid);
+                    entry.setThreadName(thread);
+                    entry.setUserId(userId);
+                    entry.setLogLevel(level);
+                    entry.setEndpoint(url);
+                    entry.addRawLogLine(fullLine);
+
+                    if (traceId != null) pendingByTrace.put(traceId, entry);
+                    if (thread != null) pendingByThread.put(thread, entry);
+
+                    captureService.onEntryCreated(entry);
+                }
             }
             return;
         }
@@ -274,14 +302,16 @@ public class MeshOutputAnalyzer {
         if ((message.contains("Writing [") && message.contains("application/json")) ||
                 (pending == null && (message.contains("query=") || message.contains("mutation=") ||
                         (message.startsWith("{") && (message.contains("\"query\"") || message.contains("\"mutation\"")))))) {
-            if (pending != null) {
+            if (pending != null && pending.getHttpStatus() == null && pending.getRawResponse() == null) {
                 pending.addRawLogLine(fullLine);
                 parseWritingJsonPayload(pending, message);
                 captureService.onEntryUpdated(pending);
-            } else if (message.contains("query=") || message.contains("mutation=") ||
-                    (message.startsWith("{") && (message.contains("\"query\"") || message.contains("\"mutation\"")))) {
+            } else {
+                if (pending != null) {
+                    cleanupPendingEntry(pending);
+                }
                 // Standalone query detected without preceding "Execute GraphQL query"
-                MeshRequestEntry existing = captureService.findEntryByTimestamp(timestampStr);
+                MeshRequestEntry existing = captureService.findMatchingEntry(timestampStr, traceId, thread, null);
                 if (existing != null) {
                     if (traceId != null) pendingByTrace.put(traceId, existing);
                     if (thread != null) pendingByThread.put(thread, existing);
@@ -418,7 +448,7 @@ public class MeshOutputAnalyzer {
                 captureService.onEntryUpdated(pending);
             } else {
                 // Standalone error log (Tomcat servlet error, Spring Boot exception, unhandled backend exception, etc.)
-                MeshRequestEntry existing = captureService.findEntryByTimestamp(timestampStr);
+                MeshRequestEntry existing = captureService.findMatchingEntry(timestampStr, traceId, thread, null);
                 if (existing != null) {
                     if (traceId != null) pendingByTrace.put(traceId, existing);
                     if (thread != null) pendingByThread.put(thread, existing);
@@ -729,7 +759,16 @@ public class MeshOutputAnalyzer {
             if (entry != null) return entry;
         }
         if (thread != null && !thread.isBlank()) {
-            return pendingByThread.get(thread);
+            MeshRequestEntry entry = pendingByThread.get(thread);
+            if (entry != null) {
+                if (traceId != null && !traceId.isBlank() && entry.getTraceId() != null && !entry.getTraceId().isBlank()) {
+                    if (!traceId.equals(entry.getTraceId())) {
+                        cleanupPendingEntry(entry);
+                        return null;
+                    }
+                }
+                return entry;
+            }
         }
         return null;
     }

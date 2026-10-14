@@ -26,6 +26,7 @@ public final class MeshCaptureService implements Disposable {
     public interface MeshCaptureListener {
         void onEntryAdded(@NotNull MeshRequestEntry entry);
         void onEntryUpdated(@NotNull MeshRequestEntry entry);
+        default void onEntryRemoved(@NotNull MeshRequestEntry entry) {}
         void onCleared();
     }
 
@@ -86,6 +87,40 @@ public final class MeshCaptureService implements Disposable {
         return entries.size();
     }
 
+    public @Nullable MeshRequestEntry findMatchingEntry(
+            @Nullable String timestamp,
+            @Nullable String traceId,
+            @Nullable String thread,
+            @Nullable String operationName
+    ) {
+        synchronized (entries) {
+            if (traceId != null && !traceId.isBlank()) {
+                for (MeshRequestEntry e : entries) {
+                    if (traceId.equals(e.getTraceId())) {
+                        return e;
+                    }
+                }
+            }
+            if (timestamp != null && !timestamp.isBlank()) {
+                for (MeshRequestEntry e : entries) {
+                    if (timestamp.equals(e.getTimestamp())) {
+                        if (thread != null && e.getThreadName() != null && !thread.equals(e.getThreadName())) {
+                            continue;
+                        }
+                        if (operationName != null && e.getOperationName() != null && !operationName.equals(e.getOperationName())) {
+                            continue;
+                        }
+                        if (traceId != null && e.getTraceId() != null && !traceId.equals(e.getTraceId())) {
+                            continue;
+                        }
+                        return e;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     public @Nullable MeshRequestEntry findEntryByTimestamp(@Nullable String timestamp) {
         if (timestamp == null || timestamp.isBlank()) return null;
         synchronized (entries) {
@@ -99,10 +134,33 @@ public final class MeshCaptureService implements Disposable {
     }
 
     public static boolean isSameTimestamp(@NotNull MeshRequestEntry a, @NotNull MeshRequestEntry b) {
-        if (a.getTimestamp() != null && a.getTimestamp().equals(b.getTimestamp())) {
-            return true;
+        if (a.getTimestamp() != null && b.getTimestamp() != null) {
+            return a.getTimestamp().equals(b.getTimestamp());
         }
         return a.getEpochMillis() > 0 && b.getEpochMillis() > 0 && a.getEpochMillis() == b.getEpochMillis();
+    }
+
+    public static boolean isSameEntry(@NotNull MeshRequestEntry a, @NotNull MeshRequestEntry b) {
+        if (a.getId() == b.getId()) {
+            return true;
+        }
+        if (a.getTraceId() != null && !a.getTraceId().isBlank() &&
+                b.getTraceId() != null && !b.getTraceId().isBlank()) {
+            return a.getTraceId().equals(b.getTraceId());
+        }
+        if (isSameTimestamp(a, b)) {
+            if (a.getThreadName() != null && b.getThreadName() != null && !a.getThreadName().equals(b.getThreadName())) {
+                return false;
+            }
+            if (a.getOperationName() != null && b.getOperationName() != null && !a.getOperationName().equals(b.getOperationName())) {
+                return false;
+            }
+            if (a.getRootField() != null && b.getRootField() != null && !a.getRootField().equals(b.getRootField())) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
     public void onEntryCreated(@NotNull MeshRequestEntry entry) {
@@ -116,11 +174,12 @@ public final class MeshCaptureService implements Disposable {
             } catch (Throwable ignored) {}
         }
 
+        List<MeshRequestEntry> removedEntries = new ArrayList<>();
         synchronized (entries) {
-            // Guarantee records are unique by timestamp
+            // Check for duplicate or rescan
             for (int i = 0; i < entries.size(); i++) {
                 MeshRequestEntry existing = entries.get(i);
-                if (isSameTimestamp(existing, entry)) {
+                if (isSameEntry(existing, entry)) {
                     mergeEntry(existing, entry);
                     notifyUpdated(existing);
                     scheduleSaveSessionJson();
@@ -128,10 +187,14 @@ public final class MeshCaptureService implements Disposable {
                 }
             }
 
-            while (entries.size() >= maxHistory) {
-                entries.remove(0);
+            while (entries.size() >= maxHistory && !entries.isEmpty()) {
+                removedEntries.add(entries.remove(0));
             }
             entries.add(entry);
+        }
+
+        for (MeshRequestEntry removed : removedEntries) {
+            notifyRemoved(removed);
         }
 
         notifyAdded(entry);
@@ -258,6 +321,29 @@ public final class MeshCaptureService implements Disposable {
                     l.onEntryUpdated(entry);
                 } catch (Throwable t) {
                     ConfigSwitcherLog.warn(project, "MeshCaptureListener onEntryUpdated error: " + t.getMessage());
+                }
+            }
+        }
+    }
+
+    private void notifyRemoved(@NotNull MeshRequestEntry entry) {
+        var app = ApplicationManager.getApplication();
+        if (app != null) {
+            app.invokeLater(() -> {
+                for (MeshCaptureListener l : listeners) {
+                    try {
+                        l.onEntryRemoved(entry);
+                    } catch (Throwable t) {
+                        ConfigSwitcherLog.warn(project, "MeshCaptureListener onEntryRemoved error: " + t.getMessage());
+                    }
+                }
+            });
+        } else {
+            for (MeshCaptureListener l : listeners) {
+                try {
+                    l.onEntryRemoved(entry);
+                } catch (Throwable t) {
+                    ConfigSwitcherLog.warn(project, "MeshCaptureListener onEntryRemoved error: " + t.getMessage());
                 }
             }
         }

@@ -481,6 +481,20 @@ public class MeshErrorAnalysisPanel extends JPanel implements MeshCaptureService
     }
 
     @Override
+    public void onEntryRemoved(@NotNull MeshRequestEntry entry) {
+        errorTableModel.removeEntry(entry);
+        updateMetrics();
+        checkEmptyState();
+        int row = errorTable.getSelectedRow();
+        if (row >= 0) {
+            MeshRequestEntry current = errorTableModel.getEntryAt(row);
+            detailPanel.setEntry(current);
+        } else {
+            detailPanel.setEntry(null);
+        }
+    }
+
+    @Override
     public void onCleared() {
         errorTableModel.clear();
         detailPanel.setEntry(null);
