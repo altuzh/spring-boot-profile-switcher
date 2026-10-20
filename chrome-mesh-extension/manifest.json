@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Mesh GraphiQL Links",
+  "version": "0.3.0",
+  "description": "Open and run queries from Java links in a new Mesh GraphiQL editor tab.",
+  "minimum_chrome_version": "111",
+  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "host_permissions": [
+    "https://ui.mesh-java.test.ecp/*",
+    "https://ui.mesh-java.uat.ecp/*"
+  ],
+  "declarative_net_request": {
+    "rule_resources": [
+      { "id": "query_to_fragment", "enabled": true, "path": "rules.json" }
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://ui.mesh-java.test.ecp/graphiql/*",
+        "https://ui.mesh-java.uat.ecp/graphiql/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    }
+  ]
+}
