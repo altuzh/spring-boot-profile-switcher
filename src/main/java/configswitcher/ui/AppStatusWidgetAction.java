@@ -1,5 +1,6 @@
 package configswitcher.ui;
 
+import com.intellij.ide.BrowserUtil;
 import com.intellij.openapi.actionSystem.ActionUpdateThread;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
@@ -54,7 +55,7 @@ public class AppStatusWidgetAction extends AnAction implements CustomComponentAc
 
         e.getPresentation().setEnabledAndVisible(true);
         e.getPresentation().setText(info.displayText());
-        e.getPresentation().setDescription(info.tooltipText() + " (Click to open Log & Error Analyzer)");
+        e.getPresentation().setDescription(clickTooltip(info));
         e.getPresentation().setIcon(info.createIcon(JBUI.scale(10)));
         e.getPresentation().putClientProperty("statusColor", info.color());
         e.getPresentation().putClientProperty("project", project);
@@ -64,7 +65,7 @@ public class AppStatusWidgetAction extends AnAction implements CustomComponentAc
     public void actionPerformed(@NotNull AnActionEvent e) {
         Project project = e.getProject();
         if (project == null || project.isDisposed()) return;
-        openLogAnalyzer(project);
+        openStatus(project);
     }
 
     @Override
@@ -80,7 +81,7 @@ public class AppStatusWidgetAction extends AnAction implements CustomComponentAc
             public void mouseClicked(MouseEvent e) {
                 Project p = (Project) presentation.getClientProperty("project");
                 if (p != null && !p.isDisposed()) {
-                    openLogAnalyzer(p);
+                    openStatus(p);
                 }
             }
         });
@@ -101,7 +102,7 @@ public class AppStatusWidgetAction extends AnAction implements CustomComponentAc
                         AppStatusService.StatusInfo status = svc.getCurrentStatus();
                         UIUtil.invokeLaterIfNeeded(() -> {
                             presentation.setText(status.displayText());
-                            presentation.setDescription(status.tooltipText() + " (Click to open Log & Error Analyzer)");
+                            presentation.setDescription(clickTooltip(status));
                             presentation.setIcon(status.createIcon(JBUI.scale(10)));
                             presentation.putClientProperty("statusColor", status.color());
                             updateFromPresentation(label, presentation);
@@ -152,7 +153,24 @@ public class AppStatusWidgetAction extends AnAction implements CustomComponentAc
         label.repaint();
     }
 
-    private static void openLogAnalyzer(@NotNull Project project) {
+    static String applicationUrl(AppStatusService.StatusInfo status) {
+        return status.stage() == AppStatusService.AppStartupStage.STARTED
+                && status.port() != null && !status.port().isBlank()
+                ? "http://localhost:" + status.port() + "/#/" : null;
+    }
+
+    private static String clickTooltip(AppStatusService.StatusInfo status) {
+        String url = applicationUrl(status);
+        return status.tooltipText() + (url != null
+                ? " (Click to open " + url + ")" : " (Click to open Log & Error Analyzer)");
+    }
+
+    private static void openStatus(@NotNull Project project) {
+        String url = applicationUrl(AppStatusService.getInstance(project).getCurrentStatus());
+        if (url != null) {
+            BrowserUtil.browse(url);
+            return;
+        }
         ToolWindowManager twm = ToolWindowManager.getInstance(project);
         ToolWindow tw = twm.getToolWindow("Log & Error Analyzer");
         if (tw == null) {

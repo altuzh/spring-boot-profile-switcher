@@ -1,10 +1,14 @@
 package configswitcher.ui;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.options.SearchableConfigurable;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
@@ -255,11 +259,20 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         revertNowBtn.setToolTipText("Manually reverse any git patches that are currently applied to the working copy");
         revertNowBtn.addActionListener(e -> {
             PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
-            if (lang == null) lang = PluginLanguage.EN;
-            int count = GitPatchService.getInstance(project).revertAppliedPatches();
-            Messages.showInfoMessage(project,
-                    I18n.get(lang, "dialog.patches.reverted.msg", count),
-                    I18n.get(lang, "dialog.patches.reverted.title"));
+            PluginLanguage finalLang = lang != null ? lang : PluginLanguage.EN;
+            revertNowBtn.setEnabled(false);
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "ConfigSwitcher: Reverting Git Patches", false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    int count = GitPatchService.getInstance(project).revertAppliedPatches();
+                    ApplicationManager.getApplication().invokeLater(() -> {
+                        revertNowBtn.setEnabled(true);
+                        Messages.showInfoMessage(project,
+                                I18n.get(finalLang, "dialog.patches.reverted.msg", count),
+                                I18n.get(finalLang, "dialog.patches.reverted.title"));
+                    });
+                }
+            });
         });
         patchButtonsPanel.add(revertNowBtn);
 

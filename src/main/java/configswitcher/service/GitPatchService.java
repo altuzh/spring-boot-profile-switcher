@@ -4,12 +4,16 @@ import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.process.ProcessOutput;
 import com.intellij.execution.util.ExecUtil;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.Application;
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.util.concurrency.AppExecutorUtil;
 import configswitcher.model.GitPatchEntry;
 import configswitcher.state.PluginSettingsState;
 import configswitcher.util.ConfigNotifier;
@@ -27,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -440,6 +446,11 @@ public final class GitPatchService implements Disposable {
     }
 
     private ProcessOutput runGitCommand(String... args) {
+        if (project.isDisposed()) {
+            ProcessOutput output = new ProcessOutput(1);
+            output.appendStderr("Project is already disposed.");
+            return output;
+        }
         GeneralCommandLine cmd = new GeneralCommandLine("git");
         String basePath = project.getBasePath();
         if (basePath != null) {
@@ -447,6 +458,20 @@ public final class GitPatchService implements Disposable {
         }
         cmd.addParameters(args);
         try {
+            Application app = ApplicationManager.getApplication();
+            if (app != null && app.isDispatchThread()) {
+                return ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                        () -> ExecUtil.execAndGetOutput(cmd, 10_000),
+                        "Running Git patch command", false, project);
+            }
+            if (app != null && app.isReadAccessAllowed()) {
+                try {
+                    return AppExecutorUtil.getAppExecutorService().submit(() -> ExecUtil.execAndGetOutput(cmd, 10_000)).get(12, TimeUnit.SECONDS);
+                } catch (ExecutionException ee) {
+                    Throwable cause = ee.getCause();
+                    throw cause instanceof Exception ? (Exception) cause : new RuntimeException(cause);
+                }
+            }
             return ExecUtil.execAndGetOutput(cmd, 10_000);
         } catch (Exception e) {
             ConfigSwitcherLog.error(project, "Git execution failed: " + e.getMessage(), e);

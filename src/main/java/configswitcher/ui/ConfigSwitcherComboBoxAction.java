@@ -4,6 +4,9 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.actionSystem.ex.ComboBoxAction;
 import com.intellij.openapi.options.ShowSettingsUtil;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.IconLoader;
@@ -154,8 +157,13 @@ public class ConfigSwitcherComboBoxAction extends ComboBoxAction implements Dumb
 
                 @Override
                 public void actionPerformed(@NotNull AnActionEvent e) {
-                    int reverted = patchService.revertAppliedPatches();
-                    ConfigNotifier.notifyInfo(project, "Reverted " + reverted + " git patch(es).");
+                    ProgressManager.getInstance().run(new Task.Backgroundable(project, "ConfigSwitcher: Reverting Git Patches", false) {
+                        @Override
+                        public void run(@NotNull ProgressIndicator indicator) {
+                            int reverted = patchService.revertAppliedPatches();
+                            ConfigNotifier.notifyInfo(project, "Reverted " + reverted + " git patch(es).");
+                        }
+                    });
                 }
             });
         }

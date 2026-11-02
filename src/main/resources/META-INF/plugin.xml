@@ -107,11 +107,11 @@
                 text="App Status"
                 description="Shows application startup stage and health (Tomcat, Started, Error)">
             <!-- Add to Navigation Bar -->
-            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.RunSelectedConfigAction"/>
             <!-- Add to Classic Main Toolbar -->
-            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.RunSelectedConfigAction"/>
             <!-- Add to New UI Toolbar -->
-            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.RunSelectedConfigAction"/>
         </action>
 
         <!-- Quick Run / Restart with Selected Profile -->
@@ -120,6 +120,9 @@
                 text="Run Active Profile"
                 description="Run or restart application with the currently selected profile">
             <add-to-group group-id="ToolbarRunGroup" anchor="after" relative-to-action="Run"/>
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.RebuildAndRestartAction"/>
         </action>
 
         <!-- Diff Viewer Action -->

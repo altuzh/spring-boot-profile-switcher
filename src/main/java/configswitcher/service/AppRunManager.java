@@ -25,10 +25,14 @@ import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.RunContentDescriptor;
 import com.intellij.execution.ui.RunContentManager;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.compiler.CompilerManager;
 import com.intellij.openapi.components.Service;
+import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -208,6 +212,20 @@ public final class AppRunManager implements Disposable {
     }
 
     public void stopApplication() {
+        Application app = ApplicationManager.getApplication();
+        if (app != null && app.isDispatchThread()) {
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "ConfigSwitcher: Stopping Application", false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    doStopApplication();
+                }
+            });
+            return;
+        }
+        doStopApplication();
+    }
+
+    private void doStopApplication() {
         ConfigSwitcherLog.info(project, "Stopping application...");
         terminateActivePipelineProcess();
 
@@ -512,6 +530,21 @@ public final class AppRunManager implements Disposable {
     }
 
     public void executeCommandPipeline(@NotNull ConfigFileModel config, boolean isDebug, boolean skipPreRun, boolean forcePreRun) {
+        Application app = ApplicationManager.getApplication();
+        if (app != null && app.isDispatchThread()) {
+            ProgressManager.getInstance().run(new Task.Backgroundable(project, "ConfigSwitcher: Starting Pipeline (" + config.getProfile() + ")", false) {
+                @Override
+                public void run(@NotNull ProgressIndicator indicator) {
+                    doExecuteCommandPipeline(config, isDebug, skipPreRun, forcePreRun);
+                }
+            });
+            return;
+        }
+        doExecuteCommandPipeline(config, isDebug, skipPreRun, forcePreRun);
+    }
+
+    private void doExecuteCommandPipeline(@NotNull ConfigFileModel config, boolean isDebug, boolean skipPreRun, boolean forcePreRun) {
+        if (project.isDisposed()) return;
         boolean wasRunning = isAppRunning();
         terminateActivePipelineProcess();
 
@@ -726,20 +759,23 @@ public final class AppRunManager implements Disposable {
         );
         activePipelineProcess = pipelineHandler;
 
-        TextConsoleBuilder builder = TextConsoleBuilderFactory.getInstance().createBuilder(project);
-        ConsoleView console = builder.getConsole();
-        console.attachToProcess(pipelineHandler);
+        ApplicationManager.getApplication().invokeLater(() -> {
+            if (project.isDisposed()) return;
+            TextConsoleBuilder builder = TextConsoleBuilderFactory.getInstance().createBuilder(project);
+            ConsoleView console = builder.getConsole();
+            console.attachToProcess(pipelineHandler);
 
-        Executor executor = isDebug ? DefaultDebugExecutor.getDebugExecutorInstance() : DefaultRunExecutor.getRunExecutorInstance();
-        RunContentDescriptor descriptor = new RunContentDescriptor(
-                console,
-                pipelineHandler,
-                console.getComponent(),
-                tabTitle
-        );
+            Executor executor = isDebug ? DefaultDebugExecutor.getDebugExecutorInstance() : DefaultRunExecutor.getRunExecutorInstance();
+            RunContentDescriptor descriptor = new RunContentDescriptor(
+                    console,
+                    pipelineHandler,
+                    console.getComponent(),
+                    tabTitle
+            );
 
-        RunContentManager.getInstance(project).showRunContent(executor, descriptor);
-        pipelineHandler.startNotify();
+            RunContentManager.getInstance(project).showRunContent(executor, descriptor);
+            pipelineHandler.startNotify();
+        });
     }
 
     public void terminateActivePipelineProcess() {
