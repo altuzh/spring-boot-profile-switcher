@@ -5,6 +5,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.ui.Messages;
 import configswitcher.service.PortInUseFix;
+import configswitcher.service.ConfigScannerService;
+import configswitcher.service.YamlServerPort;
+import configswitcher.state.PluginSettingsState;
+import configswitcher.model.ConfigFileModel;
+import java.nio.file.Path;
 import org.jetbrains.annotations.NotNull;
 
 public final class FreePortAction extends AnAction {
@@ -12,7 +17,20 @@ public final class FreePortAction extends AnAction {
 
     @Override
     public void actionPerformed(@NotNull AnActionEvent event) {
-        String value = Messages.showInputDialog(event.getProject(), "TCP port (1–65535):", "Free blocked TCP port", null);
+        if (event.getProject() == null) return;
+        var state = PluginSettingsState.getInstance(event.getProject()).getState();
+        var scanner = ConfigScannerService.getInstance(event.getProject());
+        ConfigFileModel selected = scanner.findConfigByProfile(state.selectedProfile);
+        ConfigFileModel base = scanner.getBaseConfigFile();
+        Integer detected;
+        try {
+            Path selectedPath = state.selectedFilePath != null && !state.selectedFilePath.isBlank()
+                    ? Path.of(state.selectedFilePath) : selected != null ? Path.of(selected.getFullPath()) : null;
+            detected = YamlServerPort.read(selectedPath, base == null ? null : Path.of(base.getFullPath()));
+        } catch (Exception e) { showError(e); return; }
+        String value = Messages.showInputDialog(event.getProject(), detected == null
+                ? "server.port was not found in YAML. TCP port (1–65535):" : "server.port from YAML (1–65535):",
+                "Free blocked TCP port", null, detected == null ? "" : detected.toString(), null);
         if (value == null) return;
         int port;
         try {

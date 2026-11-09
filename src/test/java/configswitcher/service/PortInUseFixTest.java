@@ -11,6 +11,30 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PortInUseFixTest {
     @Test
+    void availablePortSucceedsWithoutChangingReservationsOrServices() throws Exception {
+        org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name", "").toLowerCase().contains("win"));
+        int port;
+        try (var socket = new java.net.ServerSocket(0)) { port = socket.getLocalPort(); }
+        Path script = Files.createTempFile("port-free-test", ".ps1");
+        Path result = Files.createTempFile("port-free-result", ".txt");
+        try (var source = getClass().getResourceAsStream("/scripts/free-reserved-port.ps1")) {
+            Files.copy(source, script, StandardCopyOption.REPLACE_EXISTING);
+            String command = "function global:netsh { throw 'Unexpected reservation change' }; "
+                    + "function global:Stop-Service { throw 'Unexpected service restart' }; & '"
+                    + script.toString().replace("'", "''") + "' -Port " + port + " -ResultFile '"
+                    + result.toString().replace("'", "''") + "'";
+            Process process = new ProcessBuilder("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command)
+                    .redirectErrorStream(true).start();
+            String output = new String(process.getInputStream().readAllBytes());
+            assertEquals(0, process.waitFor(), output + Files.readString(result));
+            assertTrue(Files.readString(result).contains("available on IPv4 and IPv6"));
+        } finally {
+            Files.deleteIfExists(script);
+            Files.deleteIfExists(result);
+        }
+    }
+
+    @Test
     void scriptPlansBothFamiliesWithoutModifyingNetworking() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(System.getProperty("os.name", "").toLowerCase().contains("win"));
         Path script = Files.createTempFile("port-plan-test", ".ps1");
