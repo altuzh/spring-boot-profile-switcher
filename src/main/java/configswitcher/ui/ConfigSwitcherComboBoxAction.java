@@ -215,6 +215,8 @@ public class ConfigSwitcherComboBoxAction extends ComboBoxAction implements Dumb
             }
         });
 
+        group.add(Separator.getInstance());
+        group.add(new FreePortAction());
         return group;
     }
 }

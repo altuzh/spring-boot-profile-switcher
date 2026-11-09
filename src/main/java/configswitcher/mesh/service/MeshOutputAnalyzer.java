@@ -586,6 +586,14 @@ public class MeshOutputAnalyzer {
     public static void classifyException(@NotNull MeshRequestEntry entry, @NotNull String message, @NotNull String fullLine) {
         String rootCause = extractRootCauseMessage(message);
         String exceptionName = extractExceptionName(message);
+        Integer port = configswitcher.service.PortInUseFix.portFrom(message);
+        if (port != null) {
+            entry.setErrorType(configswitcher.mesh.model.MeshErrorType.APP_EXCEPTION);
+            entry.setErrorCode("PORT_IN_USE");
+            entry.setRootCauseMessage("Port " + port + " is already in use or reserved by Windows.");
+            entry.setErrorMessage("Web server failed to start on port " + port);
+            return;
+        }
 
         String combined = (message + " " + fullLine).toLowerCase();
 
