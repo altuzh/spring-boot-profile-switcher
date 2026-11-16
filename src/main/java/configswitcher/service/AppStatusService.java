@@ -32,6 +32,7 @@ public final class AppStatusService implements Disposable {
     public enum AppStartupStage {
         IDLE,
         BUILDING,         // 0 - blue
+        TESTS_RUNNING,
         STARTING,
         TOMCAT_STARTED,   // 1 - grey
         WATCHDIR_STARTED, // 2 - yellow
@@ -86,6 +87,12 @@ public final class AppStatusService implements Disposable {
     private static final Pattern APP_PORT_PATTERN = Pattern.compile(
             "(?:port(?:\\(s\\))?:?\\s*|localhost:)(\\d{2,5})\\b",
             Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern MAVEN_TEST_PATTERN = Pattern.compile(
+            "\\b(?:maven-)?(?:surefire|failsafe)(?:-plugin)?:[^\\s:]+:(?:test|integration-test)\\b|\\bT E S T S\\b"
+    );
+    private static final Pattern MAVEN_BUILD_PATTERN = Pattern.compile(
+            "---\\s+\\S+:\\S+:\\S+|\\bBUILD (?:SUCCESS|FAILURE)\\b|\\bTests are skipped\\."
     );
 
     private final Project project;
@@ -167,6 +174,14 @@ public final class AppStatusService implements Disposable {
                     null,
                     detail
             );
+            case TESTS_RUNNING -> new StatusInfo(
+                    AppStartupStage.TESTS_RUNNING,
+                    "Tests running",
+                    "Maven tests are running",
+                    COLOR_BLUE,
+                    null,
+                    detail
+            );
             case STARTING -> new StatusInfo(
                     AppStartupStage.STARTING,
                     "Starting...",
@@ -185,7 +200,7 @@ public final class AppStatusService implements Disposable {
             );
             case WATCHDIR_STARTED -> new StatusInfo(
                     AppStartupStage.WATCHDIR_STARTED,
-                    "WatchDir started",
+                    port != null ? "WatchDir: " + port : "WatchDir started",
                     "2. WatchDir is started" + (port != null ? " (Tomcat: " + port + ")" : ""),
                     COLOR_YELLOW,
                     port,
@@ -211,7 +226,7 @@ public final class AppStatusService implements Disposable {
     }
 
     public synchronized void setStage(@NotNull AppStartupStage stage, @Nullable String detail) {
-        if (stage == AppStartupStage.BUILDING || stage == AppStartupStage.STARTING ||
+        if (stage == AppStartupStage.BUILDING || stage == AppStartupStage.TESTS_RUNNING || stage == AppStartupStage.STARTING ||
                 stage == AppStartupStage.TOMCAT_STARTED || stage == AppStartupStage.WATCHDIR_STARTED ||
                 stage == AppStartupStage.STARTED) {
             this.internalIsRunning = true;
@@ -319,6 +334,20 @@ public final class AppStatusService implements Disposable {
             return;
         }
 
+        if (currentStage == AppStartupStage.BUILDING || currentStage == AppStartupStage.TESTS_RUNNING ||
+                currentStage == AppStartupStage.STARTING) {
+            if (MAVEN_TEST_PATTERN.matcher(line).find()) {
+                setStage(AppStartupStage.TESTS_RUNNING);
+                return;
+            }
+            if (currentStage == AppStartupStage.TESTS_RUNNING && MAVEN_BUILD_PATTERN.matcher(line).find()) {
+                setStage(AppStartupStage.BUILDING);
+                return;
+            }
+        }
+        // Build tests can start Spring contexts without starting the application process.
+        if (currentStage == AppStartupStage.BUILDING || currentStage == AppStartupStage.TESTS_RUNNING) return;
+
         // 2. Check for Spring Boot / Application started (Stage 3 - Green)
         if (SPRING_STARTED_PATTERN.matcher(line).find() || APP_STARTED_FALLBACK_PATTERN.matcher(line).find()) {
             this.currentStage = AppStartupStage.STARTED;
@@ -343,18 +372,19 @@ public final class AppStatusService implements Disposable {
         }
 
         // 4. Check for Tomcat started on port(s): <port> (Stage 1 - Grey)
-        if (currentStage != AppStartupStage.STARTED && currentStage != AppStartupStage.WATCHDIR_STARTED) {
-            Matcher m = TOMCAT_PORT_PATTERN.matcher(line);
-            if (m.find()) {
-                this.currentPort = m.group(1);
+        Matcher m = TOMCAT_PORT_PATTERN.matcher(line);
+        if (m.find()) {
+            this.currentPort = m.group(1);
+            if (currentStage != AppStartupStage.STARTED && currentStage != AppStartupStage.WATCHDIR_STARTED) {
                 this.currentStage = AppStartupStage.TOMCAT_STARTED;
-                ConfigSwitcherLog.info(project, "AppStatusService: Tomcat port " + currentPort + " detected");
-                notifyChanged();
-            } else if (TOMCAT_FALLBACK_PATTERN.matcher(line).find()) {
-                this.currentStage = AppStartupStage.TOMCAT_STARTED;
-                ConfigSwitcherLog.info(project, "AppStatusService: Tomcat started detected (no port)");
-                notifyChanged();
             }
+            ConfigSwitcherLog.info(project, "AppStatusService: Tomcat port " + currentPort + " detected");
+            notifyChanged();
+        } else if (currentStage != AppStartupStage.STARTED && currentStage != AppStartupStage.WATCHDIR_STARTED &&
+                TOMCAT_FALLBACK_PATTERN.matcher(line).find()) {
+            this.currentStage = AppStartupStage.TOMCAT_STARTED;
+            ConfigSwitcherLog.info(project, "AppStatusService: Tomcat started detected (no port)");
+            notifyChanged();
         }
     }
 

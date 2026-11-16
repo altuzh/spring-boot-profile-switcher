@@ -10,6 +10,105 @@ import static org.junit.jupiter.api.Assertions.*;
 public class AppStatusServiceTest {
 
     @Test
+    public void testMavenTestsKeepTheirStatusDuringSpringContextStartup() {
+        AppStatusService service = new AppStatusService();
+        service.setStage(AppStartupStage.BUILDING);
+        service.processChunk("[INFO]  T E ");
+        service.processChunk("S T S\r\n");
+
+        assertEquals("Tests running", service.getCurrentStatus().displayText());
+        assertEquals(AppStatusService.COLOR_BLUE, service.getCurrentStatus().color());
+
+        service.processChunk("[INFO] Running ru.gov.pfr.ecp.fo.ko.FoKoApplicationTest\n");
+        service.processChunk("WatchDir is started\n");
+        service.processChunk("Tomcat started on port(s): 54321 (http)\n");
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"Started EstablishedOkvedTest in 2.183 seconds (JVM running for 3.124)\"}\n");
+        service.processChunk("[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0\n");
+
+        assertEquals("Tests running", service.getCurrentStatus().displayText());
+        assertNull(service.getCurrentStatus().port());
+
+        service.processChunk("[INFO] --- jar:3.2.0:jar (default-jar) @ front-office-client-n2o ---\n");
+        assertEquals(AppStartupStage.BUILDING, service.getCurrentStatus().stage());
+
+        service.setStage(AppStartupStage.STARTING);
+        service.processChunk("WatchDir is started\nTomcat started on port(s): 50906 (http)\n");
+        service.processChunk("Started FoKoApplication in 16.339 seconds\n");
+        assertEquals("Started: 50906", service.getCurrentStatus().displayText());
+    }
+
+    @Test
+    public void testMavenTestGoalsAndSkippedTests() {
+        for (String goal : new String[] {
+                "surefire:2.22.2:test", "maven-surefire-plugin:3.5.2:test",
+                "failsafe:3.5.2:integration-test", "maven-failsafe-plugin:3.5.2:integration-test"
+        }) {
+            AppStatusService service = new AppStatusService();
+            service.setStage(AppStartupStage.STARTING);
+            service.processChunk("[INFO] --- " + goal + " (default-test) @ example ---\n");
+            assertEquals("Tests running", service.getCurrentStatus().displayText(), goal);
+
+            service.processChunk("[INFO] Tests are skipped.\n");
+            assertEquals(AppStartupStage.BUILDING, service.getCurrentStatus().stage());
+        }
+    }
+
+    @Test
+    public void testSpringStartupDuringBuildDoesNotReportApplicationReady() {
+        AppStatusService service = new AppStatusService();
+        service.setStage(AppStartupStage.BUILDING);
+        service.processChunk("WatchDir is started\nTomcat started on port(s): 54321\n");
+        service.processChunk("Started FoKoApplicationTest in 2.54 seconds\n");
+        assertEquals(AppStartupStage.BUILDING, service.getCurrentStatus().stage());
+        assertNull(service.getCurrentStatus().port());
+    }
+
+    @Test
+    public void testTomcatPortAfterWatchDirIsVisibleWithoutDowngradingStage() {
+        AppStatusService service = new AppStatusService();
+        AtomicInteger notifications = new AtomicInteger();
+        service.addListener(notifications::incrementAndGet);
+        service.setStage(AppStartupStage.STARTING);
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"WatchDir is started.\"}\n");
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"N2O was started\"}\n");
+        int beforeTomcat = notifications.get();
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"Tomcat started on port(s): 50906 (http) with context path ''\"}\n");
+        assertEquals(AppStartupStage.WATCHDIR_STARTED, service.getCurrentStatus().stage());
+        assertEquals("50906", service.getCurrentStatus().port());
+        assertTrue(service.getCurrentStatus().displayText().contains("50906"));
+        assertTrue(notifications.get() > beforeTomcat);
+
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"Started FoKoApplication in 19.889 seconds (JVM running for 20.8)\"}\n");
+        assertEquals("Started: 50906", service.getCurrentStatus().displayText());
+    }
+
+    @Test
+    public void testPreChangeJsonLogsKeepStartedStatusAndPort() {
+        AppStatusService service = new AppStatusService();
+        service.setStage(AppStartupStage.STARTING);
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"Tomcat started on port(s): 50906 (http) with context path ''\"}\n");
+        assertEquals(AppStartupStage.TOMCAT_STARTED, service.getCurrentStatus().stage());
+        assertEquals("Tomcat: 50906", service.getCurrentStatus().displayText());
+
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"Started FoKoApplication in 16.339 seconds (JVM running for 17.165)\"}\n");
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"WatchDir is started.\"}\n");
+        service.processChunk("{\"level\":\"INFO\",\"message\":\"N2O was started\"}\n");
+        assertEquals(AppStartupStage.STARTED, service.getCurrentStatus().stage());
+        assertEquals("Started: 50906", service.getCurrentStatus().displayText());
+        assertEquals(AppStatusService.COLOR_GREEN, service.getCurrentStatus().color());
+    }
+
+    @Test
+    public void testTomcatPortAfterApplicationStartedIsRetained() {
+        AppStatusService service = new AppStatusService();
+        service.setStage(AppStartupStage.STARTING);
+        service.processChunk("Started FoKoApplication in 2.54 seconds\n");
+        service.processChunk("Tomcat started on port 9090 (http)\n");
+        assertEquals(AppStartupStage.STARTED, service.getCurrentStatus().stage());
+        assertEquals("Started: 9090", service.getCurrentStatus().displayText());
+    }
+
+    @Test
     public void testInitialStateIsStopped() {
         AppStatusService service = new AppStatusService();
         AppStatusService.StatusInfo info = service.getCurrentStatus();
@@ -47,7 +146,7 @@ public class AppStatusServiceTest {
         // Stage 2: WatchDir is started -> yellow
         service.processChunk("2026-09-28 01:06:35.789 INFO 1234 --- [main] c.b.w.WatchDirService : WatchDir is started\n");
         assertEquals(AppStartupStage.WATCHDIR_STARTED, service.getCurrentStatus().stage());
-        assertEquals("WatchDir started", service.getCurrentStatus().displayText());
+        assertEquals("WatchDir: 8080", service.getCurrentStatus().displayText());
         assertEquals(AppStatusService.COLOR_YELLOW, service.getCurrentStatus().color());
         assertEquals("8080", service.getCurrentStatus().port());
 
