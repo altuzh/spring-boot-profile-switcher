@@ -20,6 +20,24 @@ public final class I18n {
         put("settings.language.title", "Language / Язык", "Язык интерфейса");
         put("settings.language.label", "Interface Language:", "Язык интерфейса:");
 
+        put("action.auth.label", "Auth", "Авторизация");
+        put("action.auth.checking", "Checking", "Проверка");
+        put("action.auth.active", "Active", "Активен");
+        put("action.auth.reconnecting", "Reconnecting", "Переподключение");
+        put("action.auth.disabled", "Disabled", "Отключён");
+        put("action.auth.absent", "No forward", "Нет проброса");
+        put("action.auth.unknown", "Unknown", "Неизвестно");
+        put("action.auth.setup", "Set the service name and namespace in plugin settings.",
+                "Укажите имя сервиса и пространство имён в настройках плагина.");
+        put("action.auth.endpoint", "Lens port forwarding for {0}/{1} on service port {2}. Click to refresh.",
+                "Проброс в Lens для {0}/{1}, порт сервиса {2}. Нажмите для обновления.");
+        put("settings.auth.title", "Auth Service", "Сервис авторизации");
+        put("settings.auth.report", "Report auth state", "Показывать состояние сервиса авторизации");
+        put("settings.auth.service", "Service name:", "Имя сервиса:");
+        put("settings.auth.namespace", "Namespace:", "Пространство имён:");
+        put("settings.auth.invalid_name", "Enter a valid Kubernetes service name and namespace.",
+                "Введите допустимое имя сервиса и пространство имён Kubernetes.");
+
         // ==========================================
         // Settings - Pre-Run Stage 1: Git Patches
         // ==========================================

@@ -7,6 +7,7 @@ import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -23,6 +24,7 @@ import com.intellij.ui.components.JBScrollPane;
 import com.intellij.ui.components.JBTextArea;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.ui.table.JBTable;
+import com.intellij.util.ui.FormBuilder;
 import com.intellij.util.ui.JBUI;
 import configswitcher.i18n.I18n;
 import configswitcher.i18n.PluginLanguage;
@@ -31,6 +33,7 @@ import configswitcher.model.GitPatchEntry;
 import configswitcher.model.SwitchMode;
 import configswitcher.model.TerminalShellType;
 import configswitcher.service.AppRunManager;
+import configswitcher.service.AuthStatusService;
 import configswitcher.service.ConfigScannerService;
 import configswitcher.service.GitPatchService;
 import configswitcher.service.SessionLogManager;
@@ -104,6 +107,13 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
     private JBCheckBox colorizeErrorOutputCheckbox;
     private JBCheckBox terminalShowErrorStackTraceCheckbox;
     private JLabel reloadStatusLabel;
+
+    private JPanel authPanel;
+    private JBCheckBox reportAuthState;
+    private final JBLabel authServiceLabel = new JBLabel();
+    private final JBLabel authNamespaceLabel = new JBLabel();
+    private JBTextField authServiceField;
+    private JBTextField authNamespaceField;
 
     // GraphQL Mesh Observability
     private JPanel meshPanel;
@@ -455,6 +465,19 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         rootPanel.add(runStagePanel);
         rootPanel.add(Box.createVerticalStrut(JBUI.scale(8)));
 
+        reportAuthState = new JBCheckBox();
+        reportAuthState.addItemListener(e -> updateAuthFields());
+        authServiceField = new JBTextField();
+        authNamespaceField = new JBTextField();
+        authPanel = FormBuilder.createFormBuilder()
+                .addComponent(reportAuthState)
+                .addLabeledComponent(authServiceLabel, authServiceField)
+                .addLabeledComponent(authNamespaceLabel, authNamespaceField)
+                .getPanel();
+        authPanel.setBorder(BorderFactory.createTitledBorder(""));
+        rootPanel.add(authPanel);
+        rootPanel.add(Box.createVerticalStrut(JBUI.scale(8)));
+
         // =========================================================================
         // 4. GraphQL Mesh Observability Section
         // =========================================================================
@@ -553,6 +576,13 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
 
     private void updateLocalization(PluginLanguage lang) {
         if (lang == null) lang = PluginLanguage.EN;
+
+        updatePanelBorder(authPanel, I18n.get(lang, "settings.auth.title"));
+        if (authPanel != null) {
+            reportAuthState.setText(I18n.get(lang, "settings.auth.report"));
+            authServiceLabel.setText(I18n.get(lang, "settings.auth.service"));
+            authNamespaceLabel.setText(I18n.get(lang, "settings.auth.namespace"));
+        }
 
         updatePanelBorder(languagePanel, I18n.get(lang, "settings.language.title"));
         if (languageLabel != null) languageLabel.setText(I18n.get(lang, "settings.language.label"));
@@ -806,14 +836,24 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                 terminalOutputErrorCheckbox.isSelected() != state.terminalOutputError ||
                 colorizeErrorOutputCheckbox.isSelected() != state.colorizeErrorOutputInTerminal ||
                 terminalShowErrorStackTraceCheckbox.isSelected() != state.terminalShowErrorStackTrace ||
+                reportAuthState.isSelected() != state.reportAuthState ||
+                !authServiceField.getText().trim().equals(state.authServiceName) ||
+                !authNamespaceField.getText().trim().equals(state.authNamespace) ||
                 enableMeshCaptureCheckbox.isSelected() != state.enableMeshCapture ||
                 !meshEndpointUrlField.getText().trim().equals(state.selectedMeshWebAddress != null && !state.selectedMeshWebAddress.isEmpty() ? state.selectedMeshWebAddress : state.meshDefaultEndpointUrl) ||
                 !meshMaxHistoryField.getText().trim().equals(String.valueOf(state.meshMaxHistory));
     }
 
     @Override
-    public void apply() {
+    public void apply() throws ConfigurationException {
         PluginSettingsState.State state = settings.getState();
+        String authService = authServiceField.getText().trim();
+        String authNamespace = authNamespaceField.getText().trim();
+        PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
+        if (reportAuthState.isSelected() && !(authService.isEmpty() && authNamespace.isEmpty())
+                && (!isKubernetesName(authService) || !isKubernetesName(authNamespace))) {
+            throw new ConfigurationException(I18n.get(lang, "settings.auth.invalid_name"));
+        }
         if (languageCombo != null && languageCombo.getSelectedItem() instanceof PluginLanguage pl) {
             state.language = pl;
         }
@@ -842,6 +882,12 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         state.colorizeErrorOutputInTerminal = colorizeErrorOutputCheckbox.isSelected();
         state.terminalShowErrorStackTrace = terminalShowErrorStackTraceCheckbox.isSelected();
 
+        state.reportAuthState = reportAuthState.isSelected();
+        state.authServiceName = authService;
+        state.authNamespace = authNamespace;
+        AuthStatusService auth = project.getServiceIfCreated(AuthStatusService.class);
+        if (auth != null) auth.settingsChanged(state);
+
         state.switchMode = SwitchMode.PROFILE_ARGUMENTS;
         state.autoRestart = true;
         state.backupFileBeforeSwap = true;
@@ -861,6 +907,16 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
 
         ConfigScannerService.getInstance(project).refreshConfigurations();
         configswitcher.mesh.ui.MeshToolWindowFactory.reinitToolWindow(project);
+    }
+
+    private void updateAuthFields() {
+        boolean enabled = reportAuthState.isSelected();
+        authServiceField.setEnabled(enabled);
+        authNamespaceField.setEnabled(enabled);
+    }
+
+    private static boolean isKubernetesName(String name) {
+        return name.matches("[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?");
     }
 
     @Override
@@ -891,6 +947,13 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         if (terminalOutputErrorCheckbox != null) terminalOutputErrorCheckbox.setSelected(state.terminalOutputError);
         if (colorizeErrorOutputCheckbox != null) colorizeErrorOutputCheckbox.setSelected(state.colorizeErrorOutputInTerminal);
         if (terminalShowErrorStackTraceCheckbox != null) terminalShowErrorStackTraceCheckbox.setSelected(state.terminalShowErrorStackTrace);
+
+        if (authPanel != null) {
+            reportAuthState.setSelected(state.reportAuthState);
+            updateAuthFields();
+            authServiceField.setText(state.authServiceName);
+            authNamespaceField.setText(state.authNamespace);
+        }
 
         if (enableMeshCaptureCheckbox != null) enableMeshCaptureCheckbox.setSelected(state.enableMeshCapture);
         if (meshEndpointUrlField != null) meshEndpointUrlField.setText(state.selectedMeshWebAddress != null && !state.selectedMeshWebAddress.isEmpty() ? state.selectedMeshWebAddress : state.meshDefaultEndpointUrl);

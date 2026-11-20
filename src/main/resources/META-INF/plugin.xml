@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>spring-boot-profile-switcher</id>
     <name>Spring Boot Profile Switcher</name>
-    <version>1.0.33</version>
+    <version>1.0.34</version>
     <vendor email="altuzh@users.noreply.github.com" url="https://github.com/altuzh/spring-boot-profile-switcher">altuzh</vendor>
 
     <description><![CDATA[
@@ -75,17 +75,25 @@
             <add-to-group group-id="MainToolbarRight" anchor="first"/>
         </action>
 
+        <action id="configswitcher.ui.AuthStatusAction"
+                class="configswitcher.ui.AuthStatusAction"
+                text="Auth Service Status">
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+        </action>
+
         <!-- Start / Stop Application Action -->
         <action id="configswitcher.ui.StartStopConfigAction"
                 class="configswitcher.ui.StartStopConfigAction"
                 text="Start / Stop Application"
                 description="Start or stop application with the selected profile">
             <!-- Add to Navigation Bar -->
-            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <add-to-group group-id="NavBarToolBar" anchor="after" relative-to-action="configswitcher.ui.AuthStatusAction"/>
             <!-- Add to Classic Main Toolbar -->
-            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <add-to-group group-id="MainToolBar" anchor="after" relative-to-action="configswitcher.ui.AuthStatusAction"/>
             <!-- Add to New UI Toolbar -->
-            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.ConfigSwitcherComboBoxAction"/>
+            <add-to-group group-id="MainToolbarRight" anchor="after" relative-to-action="configswitcher.ui.AuthStatusAction"/>
         </action>
 
         <!-- Rebuild & Restart Action -->

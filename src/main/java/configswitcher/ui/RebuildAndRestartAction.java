@@ -10,6 +10,7 @@ import configswitcher.i18n.I18n;
 import configswitcher.i18n.PluginLanguage;
 import configswitcher.model.ConfigFileModel;
 import configswitcher.service.AppRunManager;
+import configswitcher.service.AuthStatusService;
 import configswitcher.service.ConfigScannerService;
 import configswitcher.state.PluginSettingsState;
 import configswitcher.util.ConfigNotifier;
@@ -56,6 +57,7 @@ public class RebuildAndRestartAction extends AnAction implements DumbAware {
         if (project == null || project.isDisposed()) return;
 
         PluginSettingsState.State settings = PluginSettingsState.getInstance(project).getState();
+        if (settings.reportAuthState) project.getService(AuthStatusService.class).refresh();
         ConfigScannerService scanner = ConfigScannerService.getInstance(project);
 
         ConfigFileModel config = scanner.findConfigByProfile(settings.selectedProfile);

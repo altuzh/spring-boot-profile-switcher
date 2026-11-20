@@ -55,6 +55,10 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
         public boolean executeInTerminal = true;
         public TerminalShellType terminalShellType = TerminalShellType.AUTO;
 
+        public boolean reportAuthState = true;
+        public String authServiceName = "";
+        public String authNamespace = "";
+
         // Terminal Output Log Level Filtering & Colorization
         public boolean terminalOutputDebug = true;
         public boolean terminalOutputInfo = true;
