@@ -67,6 +67,8 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
     private JButton pastePatchBtn;
     private JButton addPatchFileBtn;
     private JButton removePatchBtn;
+    private JButton applySelectedPatchBtn;
+    private boolean applyingSelectedPatch;
     private JButton revertNowBtn;
     private JBCheckBox revertBeforeApplyCheckbox;
     private JBCheckBox autoRevertPatchesCheckbox;
@@ -254,6 +256,12 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
             }
         });
         patchButtonsPanel.add(removePatchBtn);
+
+        applySelectedPatchBtn = new JButton("Apply Selected");
+        applySelectedPatchBtn.setEnabled(false);
+        applySelectedPatchBtn.addActionListener(e -> applySelectedPatch());
+        patchTable.getSelectionModel().addListSelectionListener(e -> updateApplySelectedPatchButton());
+        patchButtonsPanel.add(applySelectedPatchBtn);
 
         revertNowBtn = new JButton("Revert Applied Patches Now");
         revertNowBtn.setToolTipText("Manually reverse any git patches that are currently applied to the working copy");
@@ -546,6 +554,10 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         }
         if (addPatchFileBtn != null) addPatchFileBtn.setText(I18n.get(lang, "settings.patches.btn.add"));
         if (removePatchBtn != null) removePatchBtn.setText(I18n.get(lang, "settings.patches.btn.remove"));
+        if (applySelectedPatchBtn != null) {
+            applySelectedPatchBtn.setText(I18n.get(lang, "settings.patches.btn.apply"));
+            applySelectedPatchBtn.setToolTipText(I18n.get(lang, "settings.patches.btn.apply.tooltip"));
+        }
         if (revertNowBtn != null) {
             revertNowBtn.setText(I18n.get(lang, "settings.patches.btn.revert"));
             revertNowBtn.setToolTipText(I18n.get(lang, "settings.patches.btn.revert.tooltip"));
@@ -662,21 +674,53 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         return I18n.get(lang != null ? lang : PluginLanguage.EN, "settings.patches.profile.all");
     }
 
+    private void updateApplySelectedPatchButton() {
+        applySelectedPatchBtn.setEnabled(!applyingSelectedPatch && patchTable.getSelectedRowCount() == 1);
+    }
+
+    private void applySelectedPatch() {
+        int row = patchTable.getSelectedRow();
+        if (row < 0 || patchTable.getSelectedRowCount() != 1 || applyingSelectedPatch) return;
+        if (patchTable.isEditing() && !patchTable.getCellEditor().stopCellEditing()) return;
+        GitPatchEntry entry = getPatchFromTable(patchTable.convertRowIndexToModel(row));
+        if (entry == null) return;
+
+        PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
+        String title = I18n.get(lang != null ? lang : PluginLanguage.EN, "task.patches.apply");
+        applyingSelectedPatch = true;
+        updateApplySelectedPatchButton();
+        ProgressManager.getInstance().run(new Task.Backgroundable(project, title, false) {
+            @Override
+            public void run(@NotNull ProgressIndicator indicator) {
+                GitPatchService.getInstance(project).applySelectedPatch(entry);
+            }
+
+            @Override
+            public void onFinished() {
+                applyingSelectedPatch = false;
+                updateApplySelectedPatchButton();
+            }
+        });
+    }
+
+    private @Nullable GitPatchEntry getPatchFromTable(int row) {
+        String path = (String) patchTableModel.getValueAt(row, 1);
+        if (path == null || path.trim().isEmpty()) return null;
+        String desc = (String) patchTableModel.getValueAt(row, 2);
+        return new GitPatchEntry(
+                Boolean.TRUE.equals(patchTableModel.getValueAt(row, 0)),
+                path.trim(),
+                desc != null ? desc.trim() : "",
+                (String) patchTableModel.getValueAt(row, PATCH_PROFILE_COLUMN)
+        );
+    }
+
     private List<GitPatchEntry> getPatchesFromTable() {
         List<GitPatchEntry> list = new ArrayList<>();
         if (patchTableModel == null) return list;
         for (int i = 0; i < patchTableModel.getRowCount(); i++) {
-            Boolean enabled = (Boolean) patchTableModel.getValueAt(i, 0);
-            String path = (String) patchTableModel.getValueAt(i, 1);
-            String desc = (String) patchTableModel.getValueAt(i, 2);
-            if (path != null && !path.trim().isEmpty()) {
-                list.add(new GitPatchEntry(
-                        Boolean.TRUE.equals(enabled),
-                        path.trim(),
-                        desc != null ? desc.trim() : "",
-                        (String) patchTableModel.getValueAt(i, PATCH_PROFILE_COLUMN)
-                ));
-            }
+            GitPatchEntry entry = getPatchFromTable(i);
+            if (entry != null) list.add(entry);
         }
         return list;
     }

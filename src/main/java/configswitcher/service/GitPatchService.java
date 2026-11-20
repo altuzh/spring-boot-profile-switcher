@@ -10,10 +10,12 @@ import com.intellij.openapi.components.Service;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.progress.ProgressManager;
+import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
+import configswitcher.i18n.I18n;
 import configswitcher.model.GitPatchEntry;
 import configswitcher.state.PluginSettingsState;
 import configswitcher.util.ConfigNotifier;
@@ -339,9 +341,29 @@ public final class GitPatchService implements Disposable {
         }
 
         ConfigSwitcherLog.info(project, "GitPatchService: Applying " + toApply.size() + " patch(es) for active profile '" + activeProfile + "'");
+        if (!applyPatches(toApply, settings.revertPatchFilesBeforeApply)) return false;
 
+        ConfigNotifier.notifyInfo(project, "Applied " + toApply.size() + " git patch(es) for active profile '" + activeProfile + "'.");
+        return true;
+    }
+
+    public synchronized boolean applySelectedPatch(@NotNull GitPatchEntry entry) {
+        File patchFile = resolvePatchFile(entry.getPatchPath());
+        for (GitPatchEntry applied : appliedPatchesJournal) {
+            if (FileUtil.filesEqual(patchFile, resolvePatchFile(applied.getPatchPath()))) {
+                ConfigNotifier.notifyInfo(project, I18n.get(project, "notification.patches.already_applied", entry.getPatchPath()));
+                return true;
+            }
+        }
+        if (!applyPatches(List.of(entry), false)) return false;
+
+        ConfigNotifier.notifyInfo(project, I18n.get(project, "notification.patches.applied", entry.getPatchPath()));
+        return true;
+    }
+
+    private boolean applyPatches(List<GitPatchEntry> toApply, boolean revertBeforeApply) {
         // Before applying patch, changes in files in patch should be reverted
-        if (settings.revertPatchFilesBeforeApply) {
+        if (revertBeforeApply) {
             for (GitPatchEntry entry : toApply) {
                 File patchFile = resolvePatchFile(entry.getPatchPath());
                 if (patchFile.exists()) {
@@ -363,7 +385,7 @@ public final class GitPatchService implements Disposable {
             // 1. Dry run check
             ProcessOutput checkOutput = runGitCommand("apply", "--check", "--whitespace=nowarn", patchFile.getAbsolutePath());
             if (checkOutput.getExitCode() != 0) {
-                if (settings.revertPatchFilesBeforeApply) {
+                if (revertBeforeApply) {
                     revertPatchAffectedFiles(patchFile);
                     checkOutput = runGitCommand("apply", "--check", "--whitespace=nowarn", patchFile.getAbsolutePath());
                 }
@@ -390,7 +412,6 @@ public final class GitPatchService implements Disposable {
         }
 
         refreshProjectVfs();
-        ConfigNotifier.notifyInfo(project, "Applied " + appliedInThisBatch.size() + " git patch(es) for active profile '" + activeProfile + "'.");
         return true;
     }
 
@@ -483,7 +504,7 @@ public final class GitPatchService implements Disposable {
 
     private void refreshProjectVfs() {
         String basePath = project.getBasePath();
-        if (basePath != null) {
+        if (basePath != null && ApplicationManager.getApplication() != null) {
             VirtualFile projectDir = LocalFileSystem.getInstance().findFileByPath(basePath);
             if (projectDir != null) {
                 VfsUtil.markDirtyAndRefresh(true, true, true, projectDir);

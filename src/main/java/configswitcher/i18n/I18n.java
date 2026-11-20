@@ -37,6 +37,11 @@ public final class I18n {
                 "Вставить git diff из буфера обмена, сохранить в проекте (.idea/patches/) и добавить в список");
         put("settings.patches.btn.add", "Add File...", "Добавить файл...");
         put("settings.patches.btn.remove", "Remove Selected", "Удалить выбранное");
+        put("settings.patches.btn.apply", "Apply Selected", "Применить выбранный патч");
+        put("settings.patches.btn.apply.tooltip", "Apply the selected patch to the working copy", "Применить выбранный патч к рабочей копии");
+        put("task.patches.apply", "Applying Git Patch", "Применение Git-патча");
+        put("notification.patches.applied", "Applied Git patch: {0}", "Применён Git-патч: {0}");
+        put("notification.patches.already_applied", "Git patch is already applied: {0}", "Git-патч уже применён: {0}");
         put("settings.patches.btn.revert", "Revert Applied Patches Now", "Откатить примененные патчи сейчас");
         put("settings.patches.btn.revert.tooltip",
                 "Manually reverse any git patches that are currently applied to the working copy",
