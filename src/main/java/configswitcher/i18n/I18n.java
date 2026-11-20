@@ -232,6 +232,9 @@ public final class I18n {
         put("mesh.proxy.refresh_failed", "Could not refresh the query.", "Не удалось повторить запрос.");
         put("mesh.proxy.details", "Details", "Подробности");
         put("mesh.proxy.requests", "Requests", "Запросы");
+        put("mesh.proxy.col.root_field", "Root Field", "Корневое поле");
+        put("mesh.proxy.col.cache", "Cache", "Кэш");
+        put("mesh.proxy.col.action", "Action", "Действие");
         put("mesh.proxy.bypass_rules", "Always Bypass List", "Список исключений");
         put("mesh.proxy.always_bypass", "Always Bypass", "Всегда обходить кэш");
         put("mesh.proxy.remove_bypass", "Remove Selected Rules", "Удалить выбранные правила");
@@ -240,9 +243,9 @@ public final class I18n {
         put("mesh.proxy.active_profile", "Active profile · %s", "Активный профиль · %s");
         put("mesh.proxy.cache_cleared", "Cleared the cache for %s.", "Кэш для %s очищен.");
         put("mesh.proxy.clear_failed", "Could not fully clear the cache for %s.", "Не удалось полностью очистить кэш для %s.");
-        put("mesh.proxy.detail_format", "%s\nHTTP %d · %d ms · %s\n\nLookup\n%s\n\nStorage\n%s"
+        put("mesh.proxy.detail_format", "%s\n%s · HTTP %d · %d ms · %s\n\nLookup\n%s\n\nStorage\n%s"
                         + "\n\nForwarded request headers\n%s\n\nResponse headers\n%s",
-                "%s\nHTTP %d · %d мс · %s\n\nПоиск\n%s\n\nХранение\n%s"
+                "%s\n%s · HTTP %d · %d мс · %s\n\nПоиск\n%s\n\nХранение\n%s"
                         + "\n\nПереданные заголовки запроса\n%s\n\nЗаголовки ответа\n%s");
 
         // Toolbar buttons – MeshInspectorPanel

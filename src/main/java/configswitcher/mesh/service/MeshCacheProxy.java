@@ -166,7 +166,7 @@ public final class MeshCacheProxy implements Disposable {
     private record CachedResponse(Map<String, List<String>> headers, byte[] body, String ruleId) {
     }
 
-    public record RequestView(long id, Instant time, String operation, int status, String cacheStatus,
+    public record RequestView(long id, Instant time, String operation, String rootField, int status, String cacheStatus,
                               String request, String response, boolean refreshable, String ruleId,
                               String lookup, String storage, long elapsedMs, String requestHeaders, String responseHeaders) {
     }
@@ -177,8 +177,11 @@ public final class MeshCacheProxy implements Disposable {
     private record Seen(Replay replay, Map<String, String> headerKeys) {
     }
 
+    private record RequestNames(String operation, String rootField) {
+    }
+
     private record Incoming(String method, String queryString, Map<String, List<String>> headers, byte[] body,
-                            String ruleId, Operation operation, String label, Map<String, String> headerKeys) {
+                            String ruleId, Operation operation, RequestNames names, Map<String, String> headerKeys) {
     }
 
     private record Decision(String key, String status, String reason, long revision) {
@@ -267,7 +270,8 @@ public final class MeshCacheProxy implements Disposable {
                 if (!decision.status().equals("REFRESH")) {
                     displayedResponseHeaders.put("x-mesh-cache", List.of(decision.status()));
                 }
-                var view = new RequestView(++requestId, Instant.now(), incoming.label(), status, decision.status(),
+                var view = new RequestView(++requestId, Instant.now(), incoming.names().operation(),
+                        incoming.names().rootField(), status, decision.status(),
                         requestText, responseText, replay != null, incoming.ruleId(), decision.reason(), storage,
                         Duration.ofNanos(System.nanoTime() - started).toMillis(),
                         displayHeaders(incoming.headers(), matchedHeaders), displayHeaders(displayedResponseHeaders, matchedHeaders));
@@ -286,7 +290,7 @@ public final class MeshCacheProxy implements Disposable {
                 Replay replay = prior == null ? null : prior.replay();
                 if (!enabled || replay == null) return null;
                 incoming = new Incoming("POST", null, replay.headers(), replay.body(), view.ruleId(), Operation.QUERY,
-                        view.operation(), prior.headerKeys());
+                        new RequestNames(view.operation(), view.rootField()), prior.headerKeys());
                 String key = bypassRules.contains(view.ruleId()) ? null : cacheKey(replay.headers(), replay.body());
                 if (key != null) {
                     cache.remove(key);
@@ -346,7 +350,7 @@ public final class MeshCacheProxy implements Disposable {
                 String ruleId = fingerprint(Map.of("method", List.of(method), "query", queryString == null
                         ? List.of() : List.of(queryString)), body);
                 var incoming = new Incoming(method, queryString, headers, body, ruleId, operation,
-                        operationLabel(preview(body, ""), method), headerKeys(headers, matchedHeaders));
+                        requestNames(preview(body, ""), method), headerKeys(headers, matchedHeaders));
                 Decision decision;
                 CachedResponse hit;
                 synchronized (cache) {
@@ -400,7 +404,7 @@ public final class MeshCacheProxy implements Disposable {
             boolean otherBody = false;
             for (RequestView view : recent.keySet()) {
                 if (view.ruleId().equals(request.ruleId())) previous = view;
-                else if (view.operation().equals(request.label())) otherBody = true;
+                else if (view.operation().equals(request.names().operation())) otherBody = true;
             }
             if (previous == null) return otherBody ? "The request body or variables differ from the earlier request."
                     : "No response is cached for this request.";
@@ -507,21 +511,24 @@ public final class MeshCacheProxy implements Disposable {
         }
     }
 
-    private static String operationLabel(String request, String fallback) {
+    private static RequestNames requestNames(String request, String fallback) {
         try {
             JsonObject payload = JSON.fromJson(request, JsonObject.class);
-            if (payload != null && payload.has("operationName") && payload.get("operationName").isJsonPrimitive()) {
-                String name = payload.get("operationName").getAsString();
-                if (name.matches("[A-Za-z_][A-Za-z_0-9]{0,63}")) return name;
-            }
-            if (payload != null && payload.has("query") && payload.get("query").isJsonPrimitive()) {
-                String query = payload.get("query").getAsString();
+            if (payload != null) {
+                var queryValue = payload.get("query");
+                String query = queryValue != null && queryValue.isJsonPrimitive() ? queryValue.getAsString() : null;
+                String rootField = GraphQLFormatter.extractRootField(query);
+                var operationName = payload.get("operationName");
+                if (operationName != null && operationName.isJsonPrimitive()) {
+                    String name = operationName.getAsString();
+                    if (name.matches("[A-Za-z_][A-Za-z_0-9]{0,63}")) return new RequestNames(name, rootField);
+                }
                 String name = GraphQLFormatter.extractOperationName(query);
-                if (name != null && name.matches("[A-Za-z_][A-Za-z_0-9]{0,63}")) return name;
+                return new RequestNames(name != null && name.matches("[A-Za-z_][A-Za-z_0-9]{0,63}") ? name : fallback, rootField);
             }
         } catch (RuntimeException ignored) {
         }
-        return fallback;
+        return new RequestNames(fallback, null);
     }
 
     private static String preview(byte[] body, String encoding) {

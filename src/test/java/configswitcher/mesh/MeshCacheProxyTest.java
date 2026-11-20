@@ -92,6 +92,8 @@ class MeshCacheProxyTest {
         assertEquals("MISS", cacheStatus(first));
         assertEquals("Bearer alice", first.headers().firstValue("X-Seen-Authorization").orElseThrow());
         var captured = proxy.requests().get(0);
+        assertEquals("Read", captured.operation());
+        assertEquals("customer", captured.rootField());
         assertTrue(captured.requestHeaders().contains("authorization: [redacted]"));
         assertTrue(captured.responseHeaders().contains("x-seen-authorization: [redacted]"));
         assertFalse((captured.requestHeaders() + captured.responseHeaders()).contains("Bearer alice"));
@@ -258,6 +260,7 @@ class MeshCacheProxyTest {
         var first = post(QUERY, "Bearer alice");
         var result = proxy.refresh(proxy.requests().get(0));
         assertEquals("REFRESH", result.cacheStatus());
+        assertEquals("customer", result.rootField());
         assertEquals("{\"data\":{\"call\":2}}", result.response());
         proxy.stop();
         proxy = new MeshCacheProxy();
