@@ -22,6 +22,7 @@ import com.intellij.ui.table.JBTable;
 import com.intellij.util.ui.JBUI;
 import configswitcher.i18n.I18n;
 import configswitcher.i18n.PluginLanguage;
+import configswitcher.model.ConfigFileModel;
 import configswitcher.model.ExecutionMode;
 import configswitcher.model.GitPatchEntry;
 import configswitcher.model.SwitchMode;
@@ -38,6 +39,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.*;
@@ -46,6 +48,7 @@ import java.util.List;
 @SuppressWarnings("deprecation")
 public class PluginSettingsConfigurable implements SearchableConfigurable {
     public static final String ID = "configswitcher.settings";
+    private static final int PATCH_PROFILE_COLUMN = 3;
 
     private final Project project;
     private final PluginSettingsState settings;
@@ -185,7 +188,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         patchesPanel = new JPanel(new BorderLayout(0, JBUI.scale(6)));
         patchesPanel.setBorder(BorderFactory.createTitledBorder(I18n.get(PluginLanguage.EN, "settings.patches.title")));
 
-        String[] columns = {"Active", "Patch File Path", "Description"};
+        String[] columns = {"Active", "Patch File Path", "Description", "Profile"};
         patchTableModel = new DefaultTableModel(columns, 0) {
             @Override
             public Class<?> getColumnClass(int columnIndex) {
@@ -195,6 +198,8 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         patchTable = new JBTable(patchTableModel);
         patchTable.setPreferredScrollableViewportSize(new Dimension(JBUI.scale(550), JBUI.scale(100)));
         patchTable.getColumnModel().getColumn(0).setMaxWidth(JBUI.scale(50));
+        patchTable.putClientProperty("terminateEditOnFocusLost", true);
+        configurePatchProfileColumn();
 
         patchesPanel.add(new JScrollPane(patchTable), BorderLayout.CENTER);
 
@@ -211,16 +216,11 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                         I18n.get(lang, "dialog.patches.empty_clipboard.title"));
                 return;
             }
-            PluginSettingsState.State st = settings.getState();
-            PasteGitPatchDialog dlg = new PasteGitPatchDialog(project, clip, st.selectedProfile);
+            PasteGitPatchDialog dlg = new PasteGitPatchDialog(project, clip);
             if (dlg.showAndGet()) {
                 GitPatchEntry created = dlg.getCreatedEntry();
                 if (created != null) {
-                    patchTableModel.addRow(new Object[]{
-                            created.isEnabled(),
-                            created.getPatchPath(),
-                            created.getDescription()
-                    });
+                    addPatchRow(created);
                 }
             }
         });
@@ -241,7 +241,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                     relPath = relPath.substring(basePath.length());
                     if (relPath.startsWith("/") || relPath.startsWith("\\")) relPath = relPath.substring(1);
                 }
-                patchTableModel.addRow(new Object[]{true, relPath, ""});
+                addPatchRow(new GitPatchEntry(true, relPath, "", ""));
             }
         });
         patchButtonsPanel.add(addPatchFileBtn);
@@ -532,11 +532,13 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         if (languageHelp != null) languageHelp.updateTooltip(I18n.get(lang, "help.language"));
 
         updatePanelBorder(patchesPanel, I18n.get(lang, "settings.patches.title"));
-        if (patchTable != null && patchTable.getColumnModel().getColumnCount() >= 3) {
+        if (patchTable != null) {
             patchTable.getColumnModel().getColumn(0).setHeaderValue(I18n.get(lang, "settings.patches.col.active"));
             patchTable.getColumnModel().getColumn(1).setHeaderValue(I18n.get(lang, "settings.patches.col.path"));
             patchTable.getColumnModel().getColumn(2).setHeaderValue(I18n.get(lang, "settings.patches.col.description"));
+            patchTable.getColumnModel().getColumn(PATCH_PROFILE_COLUMN).setHeaderValue(I18n.get(lang, "settings.patches.col.profile"));
             patchTable.getTableHeader().repaint();
+            patchTable.repaint();
         }
         if (pastePatchBtn != null) {
             pastePatchBtn.setText(I18n.get(lang, "settings.patches.btn.paste"));
@@ -620,6 +622,46 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         return ConfigSwitcherLog.getLogDirectory(project).getAbsolutePath();
     }
 
+    private void configurePatchProfileColumn() {
+        ComboBox<String> profileCombo = new ComboBox<>();
+        profileCombo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+                                                         boolean selected, boolean focused) {
+                return super.getListCellRendererComponent(list, patchProfileLabel((String) value), index, selected, focused);
+            }
+        });
+
+        var column = patchTable.getColumnModel().getColumn(PATCH_PROFILE_COLUMN);
+        column.setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            protected void setValue(Object value) {
+                super.setValue(patchProfileLabel((String) value));
+            }
+        });
+        column.setCellEditor(new DefaultCellEditor(profileCombo) {
+            @Override
+            public Component getTableCellEditorComponent(JTable table, Object value, boolean selected, int row, int col) {
+                String profile = (String) value;
+                if (profile == null || profile.isBlank()) profile = "";
+                Set<String> profiles = new LinkedHashSet<>();
+                profiles.add("");
+                for (ConfigFileModel config : ConfigScannerService.getInstance(project).getConfigurations()) {
+                    profiles.add(config.getProfile());
+                }
+                profiles.add(profile);
+                profileCombo.setModel(new DefaultComboBoxModel<>(profiles.toArray(String[]::new)));
+                return super.getTableCellEditorComponent(table, profile, selected, row, col);
+            }
+        });
+    }
+
+    private String patchProfileLabel(@Nullable String profile) {
+        if (profile != null && !profile.isBlank()) return profile;
+        PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
+        return I18n.get(lang != null ? lang : PluginLanguage.EN, "settings.patches.profile.all");
+    }
+
     private List<GitPatchEntry> getPatchesFromTable() {
         List<GitPatchEntry> list = new ArrayList<>();
         if (patchTableModel == null) return list;
@@ -632,7 +674,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                         Boolean.TRUE.equals(enabled),
                         path.trim(),
                         desc != null ? desc.trim() : "",
-                        ""
+                        (String) patchTableModel.getValueAt(i, PATCH_PROFILE_COLUMN)
                 ));
             }
         }
@@ -641,14 +683,20 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
 
     private void setPatchesToTable(List<GitPatchEntry> patches) {
         if (patchTableModel == null) return;
+        if (patchTable.isEditing()) patchTable.getCellEditor().cancelCellEditing();
         patchTableModel.setRowCount(0);
         for (GitPatchEntry entry : patches) {
-            patchTableModel.addRow(new Object[]{
-                    entry.isEnabled(),
-                    entry.getPatchPath(),
-                    entry.getDescription()
-            });
+            addPatchRow(entry);
         }
+    }
+
+    private void addPatchRow(GitPatchEntry entry) {
+        patchTableModel.addRow(new Object[]{
+                entry.isEnabled(),
+                entry.getPatchPath(),
+                entry.getDescription(),
+                entry.getApplicableProfile()
+        });
     }
 
     @Override

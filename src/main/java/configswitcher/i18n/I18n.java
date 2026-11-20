@@ -29,6 +29,8 @@ public final class I18n {
         put("settings.patches.col.active", "Active", "Активен");
         put("settings.patches.col.path", "Patch File Path", "Путь к файлу патча");
         put("settings.patches.col.description", "Description", "Описание");
+        put("settings.patches.col.profile", "Profile", "Профиль");
+        put("settings.patches.profile.all", "All", "Все");
         put("settings.patches.btn.paste", "Paste from Clipboard...", "Вставить из буфера...");
         put("settings.patches.btn.paste.tooltip",
                 "Paste git diff from clipboard, save as file in project (.idea/patches/), and add to list",
@@ -435,8 +437,8 @@ public final class I18n {
                 "Select interface language (English or Russian).\nSwitches immediately across all dialogs, tables, and toolbar actions.",
                 "Выберите язык интерфейса плагина (English или Русский).\nЯзык переключается мгновенно во всех окнах, таблицах и действиях тулбара.");
         put("help.patches.table",
-                "List of Git patches (.patch / .diff) applied to your working directory before the build stage, and auto-reverted immediately after build finishes.\n• Check 'Active' to include in the pipeline.\n• Use 'Paste from Clipboard...' to create patches from git diff.",
-                "Список Git-патчей (.patch / .diff), автоматически применяемых к рабочей копии перед этапом сборки и автоматически откатываемых сразу после завершения сборки.\n• Отметьте 'Активен', чтобы включить патч в пайплайн.\n• Нажмите 'Вставить из буфера...', чтобы создать патч из git diff.");
+                "List of Git patches (.patch / .diff) applied to your working directory before the build stage, and auto-reverted immediately after build finishes.\n• Check 'Active' to include in the pipeline.\n• Select a target in 'Profile' or leave it on 'All'.\n• Use 'Paste from Clipboard...' to create patches from git diff.",
+                "Список Git-патчей (.patch / .diff), автоматически применяемых к рабочей копии перед этапом сборки и автоматически откатываемых сразу после завершения сборки.\n• Отметьте 'Активен', чтобы включить патч в пайплайн.\n• Выберите нужный профиль в колонке 'Профиль' или оставьте 'Все'.\n• Нажмите 'Вставить из буфера...', чтобы создать патч из git diff.");
         put("help.patches.revert_before_apply",
                 "Discards any local uncommitted/dirty changes in files targeted by git patches (git checkout -- <file>) to ensure patches apply cleanly without merge conflicts.",
                 "Сбрасывает любые локальные незакоммиченные изменения в целевых файлах патча (git checkout -- <файл>), гарантируя чистое применение без конфликтов.");

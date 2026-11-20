@@ -1,6 +1,8 @@
 package configswitcher.state;
 
+import com.intellij.util.xmlb.XmlSerializer;
 import configswitcher.model.ExecutionMode;
+import configswitcher.model.GitPatchEntry;
 import configswitcher.model.SwitchMode;
 import configswitcher.model.TerminalShellType;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +183,6 @@ public class PluginSettingsStateTest {
         olderState.autoRestart = false;
         olderState.executeInTerminal = false;
         olderState.terminalShellType = TerminalShellType.CMD;
-        olderState.gitPatches.add(new configswitcher.model.GitPatchEntry(true, ".idea/patches/p1.patch", "Old patch", "dev"));
 
         settings.loadState(olderState);
 
@@ -191,7 +192,23 @@ public class PluginSettingsStateTest {
         assertTrue(loaded.autoRestart, "autoRestart must be locked to true");
         assertTrue(loaded.executeInTerminal, "executeInTerminal must be locked to true");
         assertEquals(TerminalShellType.AUTO, loaded.terminalShellType, "terminalShellType must be locked to AUTO");
-        assertEquals("", loaded.gitPatches.get(0).getApplicableProfile(), "applicableProfile must be cleared so patches apply to active profile");
+    }
+
+    @Test
+    public void testLoadStatePreservesPatchProfileSelection() {
+        PluginSettingsState.State saved = new PluginSettingsState.State();
+        saved.gitPatches.add(new GitPatchEntry(true, ".idea/patches/p1.patch", "Dev patch", "dev"));
+        saved.gitPatches.add(new GitPatchEntry(true, ".idea/patches/p2.patch", "Shared patch", null));
+
+        settings.loadState(XmlSerializer.deserialize(
+                XmlSerializer.serialize(saved), PluginSettingsState.State.class));
+
+        List<GitPatchEntry> patches = settings.getState().gitPatches;
+        assertEquals(saved.gitPatches, patches);
+        assertTrue(patches.get(0).matchesProfile("dev"));
+        assertFalse(patches.get(0).matchesProfile("prod"));
+        assertTrue(patches.get(1).matchesProfile("dev"));
+        assertTrue(patches.get(1).matchesProfile("prod"));
     }
 
     @Test

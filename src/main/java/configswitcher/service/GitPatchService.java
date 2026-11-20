@@ -329,7 +329,7 @@ public final class GitPatchService implements Disposable {
         PluginSettingsState.State settings = PluginSettingsState.getInstance(project).getState();
         List<GitPatchEntry> toApply = new ArrayList<>();
         for (GitPatchEntry entry : settings.gitPatches) {
-            if (entry.isEnabled()) {
+            if (entry.matchesProfile(activeProfile)) {
                 toApply.add(entry);
             }
         }

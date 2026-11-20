@@ -120,13 +120,6 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
         myState.executeInTerminal = true;
         myState.terminalShellType = TerminalShellType.AUTO;
 
-        // Ensure git patches apply to the active profile (no target profile filtering)
-        if (myState.gitPatches != null) {
-            for (configswitcher.model.GitPatchEntry patch : myState.gitPatches) {
-                patch.setApplicableProfile("");
-            }
-        }
-
         // Automatically sanitize hardcoded example if present
         if ("mvn -T 8 -o \"-Dmaven.test.skip=true\"".equals(myState.preRunCommand)) {
             myState.preRunCommand = "mvn clean package";

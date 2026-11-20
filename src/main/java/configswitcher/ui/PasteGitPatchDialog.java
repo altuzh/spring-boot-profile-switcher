@@ -21,7 +21,6 @@ public class PasteGitPatchDialog extends DialogWrapper {
 
     private final Project project;
     private final String clipboardText;
-    private final String currentProfile;
 
     private JBTextField patchNameField;
     private JBTextField descriptionField;
@@ -29,11 +28,10 @@ public class PasteGitPatchDialog extends DialogWrapper {
 
     private GitPatchEntry createdEntry = null;
 
-    public PasteGitPatchDialog(@NotNull Project project, @NotNull String clipboardText, @Nullable String defaultProfile) {
+    public PasteGitPatchDialog(@NotNull Project project, @NotNull String clipboardText) {
         super(project, true);
         this.project = project;
         this.clipboardText = clipboardText;
-        this.currentProfile = (defaultProfile != null && !defaultProfile.equalsIgnoreCase("default")) ? defaultProfile : "";
 
         setTitle(I18n.get(project, "dialog.paste_patch.title"));
         init();
