@@ -38,6 +38,8 @@ import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.AppExecutorUtil;
 import com.intellij.util.execution.ParametersListUtil;
+import configswitcher.mesh.service.MeshAppSettings;
+import configswitcher.mesh.service.MeshCacheProxy;
 import configswitcher.model.ArgumentType;
 import configswitcher.model.ConfigFileModel;
 import configswitcher.model.ExecutionMode;
@@ -51,11 +53,14 @@ import org.jetbrains.plugins.terminal.ShellTerminalWidget;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -369,7 +374,7 @@ public final class AppRunManager implements Disposable {
             );
 
             if (autoRestart) {
-                executeOrRestart(runSettings, isDebug);
+                executeOrRestart(runSettings, isDebug, config, profile);
             }
         } else {
             ConfigNotifier.notifyWarning(
@@ -439,7 +444,7 @@ public final class AppRunManager implements Disposable {
         if (autoRestart) {
             RunnerAndConfigurationSettings runSettings = findTargetRunConfiguration();
             if (runSettings != null) {
-                executeOrRestart(runSettings, isDebug);
+                executeOrRestart(runSettings, isDebug, baseConfig, "default");
             }
         }
     }
@@ -484,7 +489,8 @@ public final class AppRunManager implements Disposable {
         return selected;
     }
 
-    public void executeOrRestart(@NotNull RunnerAndConfigurationSettings runSettings, boolean isDebug) {
+    private void executeOrRestart(@NotNull RunnerAndConfigurationSettings runSettings, boolean isDebug,
+                                  ConfigFileModel config, String profile) {
         Executor executor = isDebug
                 ? DefaultDebugExecutor.getDebugExecutorInstance()
                 : DefaultRunExecutor.getRunExecutorInstance();
@@ -505,7 +511,7 @@ public final class AppRunManager implements Disposable {
                             if (pendingTerminations.decrementAndGet() <= 0) {
                                 ApplicationManager.getApplication().invokeLater(() -> {
                                     if (!project.isDisposed()) {
-                                        ProgramRunnerUtil.executeConfiguration(runSettings, executor);
+                                        launchRunConfiguration(runSettings, executor, config, profile);
                                     }
                                 });
                             }
@@ -518,11 +524,54 @@ public final class AppRunManager implements Disposable {
             }
 
             if (pendingTerminations.get() <= 0) {
-                ProgramRunnerUtil.executeConfiguration(runSettings, executor);
+                launchRunConfiguration(runSettings, executor, config, profile);
             }
         } else {
-            ProgramRunnerUtil.executeConfiguration(runSettings, executor);
+            launchRunConfiguration(runSettings, executor, config, profile);
         }
+    }
+
+    private void launchRunConfiguration(RunnerAndConfigurationSettings runSettings, Executor executor,
+                                        ConfigFileModel config, String profile) {
+        if (PluginSettingsState.getInstance(project).getState().enableMeshCacheProxy
+                && runSettings.getConfiguration() instanceof CommonProgramRunConfigurationParameters params) {
+            List<String> program = ParametersListUtil.parse(Objects.toString(params.getProgramParameters(), ""));
+            List<String> args = new ArrayList<>(program);
+            if (params instanceof CommonJavaRunConfigurationParameters javaParams) {
+                args.addAll(ParametersListUtil.parse(Objects.toString(javaParams.getVMParameters(), "")));
+            }
+            Map<String, String> env = new HashMap<>();
+            if (params.isPassParentEnvs()) env.putAll(System.getenv());
+            env.putAll(params.getEnvs());
+            List<String> routed = routeMeshArguments(config, profile, args, program, env);
+            if (routed != program) {
+                RunnerAndConfigurationSettings launch = runSettings.createFactory().create();
+                if (launch.getConfiguration() instanceof CommonProgramRunConfigurationParameters launchParams) {
+                    launchParams.setProgramParameters(ParametersListUtil.join(routed));
+                    runSettings = launch;
+                }
+            }
+        }
+        ProgramRunnerUtil.executeConfiguration(runSettings, executor);
+    }
+
+    private List<String> routeMeshArguments(ConfigFileModel config, String profile, List<String> settingsArgs,
+                                            List<String> program, Map<String, String> env) {
+        try {
+            var settings = MeshAppSettings.read(Path.of(config.getFullPath()), profile, settingsArgs, env);
+            if (settings != null) {
+                var proxy = project.getService(MeshCacheProxy.class);
+                var plugin = PluginSettingsState.getInstance(project).getState();
+                proxy.setBypassRules(plugin.meshCacheBypassRules.keySet());
+                return settings.route(program, proxy.routeTo(settings.upstream(), plugin.selectedProfile,
+                        MeshCacheProxy.projectCacheDirectory(project), settings.forwardedHeaders()));
+            }
+        } catch (IOException | IllegalArgumentException e) {
+            ConfigNotifier.notifyWarning(project, "Mesh cache proxy could not use the app's Mesh settings for this launch.");
+            return program;
+        }
+        ConfigNotifier.notifyWarning(project, "Mesh cache proxy did not find a configured Mesh endpoint for this launch.");
+        return program;
     }
 
     public void executeCommandPipeline(@NotNull ConfigFileModel config, boolean isDebug, boolean skipPreRun) {
@@ -621,6 +670,9 @@ public final class AppRunManager implements Disposable {
         if (appTokens.isEmpty()) {
             ConfigNotifier.notifyError(project, "Run command template is empty.");
             return;
+        }
+        if (settings.enableMeshCacheProxy) {
+            appTokens = routeMeshArguments(config, profile, appTokens, appTokens, System.getenv());
         }
         File appWorkDir = resolveWorkDir(settings.runWorkingDir);
         List<String> resolvedAppTokens = resolveCommandTokens(appTokens, appWorkDir);

@@ -69,6 +69,8 @@ public class PluginSettingsState implements PersistentStateComponent<PluginSetti
 
         // GraphQL Mesh Observability
         public boolean enableMeshCapture = true;
+        public volatile boolean enableMeshCacheProxy = false;
+        public volatile Map<String, String> meshCacheBypassRules = new HashMap<>();
         public int meshMaxHistory = 500;
         public String meshDefaultEndpointUrl = "";
         public List<String> meshWebAddresses = new ArrayList<>();

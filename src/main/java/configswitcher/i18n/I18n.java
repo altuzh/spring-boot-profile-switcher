@@ -219,6 +219,31 @@ public final class I18n {
         put("mesh.tab.live_requests", "Live Requests", "Живые запросы");
         put("mesh.tab.error_analysis", "Error Analysis", "Анализ ошибок");
         put("mesh.tab.log_scanner", "Log Scanner", "Сканер логов");
+        put("mesh.tab.cache_proxy", "Cache Proxy", "Кэширующий прокси");
+        put("mesh.proxy.enable", "Enable Mesh Cache", "Включить кэш Mesh");
+        put("mesh.proxy.request", "Request", "Запрос");
+        put("mesh.proxy.response", "Response", "Ответ");
+        put("mesh.proxy.refresh", "Refresh Query", "Повторить запрос");
+        put("mesh.proxy.next_launch", "Mesh settings are read when the app launches through the plugin.",
+                "Настройки Mesh считываются при запуске приложения через плагин.");
+        put("mesh.proxy.disabled", "Caching is off.", "Кэширование отключено.");
+        put("mesh.proxy.refreshing", "Refreshing query…", "Выполняется повторный запрос…");
+        put("mesh.proxy.refreshed", "Mesh responded.", "Получен ответ от Mesh.");
+        put("mesh.proxy.refresh_failed", "Could not refresh the query.", "Не удалось повторить запрос.");
+        put("mesh.proxy.details", "Details", "Подробности");
+        put("mesh.proxy.requests", "Requests", "Запросы");
+        put("mesh.proxy.bypass_rules", "Always Bypass List", "Список исключений");
+        put("mesh.proxy.always_bypass", "Always Bypass", "Всегда обходить кэш");
+        put("mesh.proxy.remove_bypass", "Remove Selected Rules", "Удалить выбранные правила");
+        put("mesh.proxy.clear_cache", "Clear Profile Cache", "Очистить кэш профиля");
+        put("mesh.proxy.clear_profile_tooltip", "Clear saved Mesh responses for %s", "Очистить сохранённые ответы Mesh для %s");
+        put("mesh.proxy.active_profile", "Active profile · %s", "Активный профиль · %s");
+        put("mesh.proxy.cache_cleared", "Cleared the cache for %s.", "Кэш для %s очищен.");
+        put("mesh.proxy.clear_failed", "Could not fully clear the cache for %s.", "Не удалось полностью очистить кэш для %s.");
+        put("mesh.proxy.detail_format", "%s\nHTTP %d · %d ms · %s\n\nLookup\n%s\n\nStorage\n%s"
+                        + "\n\nForwarded request headers\n%s\n\nResponse headers\n%s",
+                "%s\nHTTP %d · %d мс · %s\n\nПоиск\n%s\n\nХранение\n%s"
+                        + "\n\nПереданные заголовки запроса\n%s\n\nЗаголовки ответа\n%s");
 
         // Toolbar buttons – MeshInspectorPanel
         put("mesh.btn.scan_log", "Scan session.log", "Сканировать session.log");

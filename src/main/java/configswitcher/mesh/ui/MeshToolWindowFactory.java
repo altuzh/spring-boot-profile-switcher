@@ -62,6 +62,9 @@ public class MeshToolWindowFactory implements ToolWindowFactory, DumbAware {
         logContent.setIcon(AllIcons.Debugger.Console);
         logContent.setDescription("Scan session.log, filter log levels, and feed logs into error classifier");
         toolWindow.getContentManager().addContent(logContent);
+
+        toolWindow.getContentManager().addContent(contentFactory.createContent(
+                new MeshCacheProxyPanel(project), I18n.get(project, "mesh.tab.cache_proxy"), false));
     }
 
     public static void reinitToolWindow(@NotNull Project project) {
