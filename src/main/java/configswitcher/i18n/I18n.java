@@ -29,18 +29,24 @@ public final class I18n {
         put("settings.patches.col.active", "Active", "Активен");
         put("settings.patches.col.path", "Patch File Path", "Путь к файлу патча");
         put("settings.patches.col.description", "Description", "Описание");
-        put("settings.patches.col.profile", "Profile", "Профиль");
-        put("settings.patches.profile.all", "All", "Все");
+        put("settings.patches.col.branch", "Parent Branch", "Родительская ветка");
+        put("settings.patches.branch.all", "All", "Все");
         put("settings.patches.btn.paste", "Paste from Clipboard...", "Вставить из буфера...");
         put("settings.patches.btn.paste.tooltip",
                 "Paste git diff from clipboard, save as file in project (.idea/patches/), and add to list",
                 "Вставить git diff из буфера обмена, сохранить в проекте (.idea/patches/) и добавить в список");
         put("settings.patches.btn.add", "Add File...", "Добавить файл...");
         put("settings.patches.btn.remove", "Remove Selected", "Удалить выбранное");
+        put("settings.patches.btn.copy", "Put Patch to Clipboard", "Скопировать патч в буфер обмена");
         put("settings.patches.btn.apply", "Apply Selected", "Применить выбранный патч");
-        put("settings.patches.btn.apply.tooltip", "Apply the selected patch to the working copy", "Применить выбранный патч к рабочей копии");
+        put("settings.patches.btn.apply.tooltip", "Apply the selected patch to the working copy on any branch", "Применить выбранный патч к рабочей копии на любой ветке");
         put("task.patches.apply", "Applying Git Patch", "Применение Git-патча");
+        put("dialog.patches.missing", "Patch file not found: {0}", "Файл патча не найден: {0}");
+        put("dialog.patches.review",
+                "Git could not apply {0} to the current files. Open the IDE patch dialog to review the changes? Edits applied there are managed by the IDE.",
+                "Git не смог применить {0} к текущим файлам. Открыть диалог IDE для просмотра изменений? Изменениями, применёнными в этом диалоге, управляет IDE.");
         put("notification.patches.applied", "Applied Git patch: {0}", "Применён Git-патч: {0}");
+        put("notification.patches.copied", "Copied Git patch to clipboard: {0}", "Git-патч скопирован в буфер обмена: {0}");
         put("notification.patches.already_applied", "Git patch is already applied: {0}", "Git-патч уже применён: {0}");
         put("settings.patches.btn.revert", "Revert Applied Patches Now", "Откатить примененные патчи сейчас");
         put("settings.patches.btn.revert.tooltip",
@@ -142,6 +148,7 @@ public final class I18n {
         put("dialog.paste_patch.save_error_title", "Error Saving Patch", "Ошибка сохранения патча");
         put("dialog.paste_patch.save_error_msg", "Failed to create patch: {0}", "Не удалось создать патч: {0}");
         put("dialog.patches.reverted.title", "Git Patches Reverted", "Git-патчи откатаны");
+        put("dialog.patches.copy_error", "Could not copy patch {0}: {1}", "Не удалось скопировать патч {0}: {1}");
         put("dialog.patches.reverted.msg", "Reverted {0} git patch(es).", "Откатано git-патчей: {0}.");
         put("dialog.patches.empty_clipboard.title", "Paste Git Patch", "Вставка Git-патча");
         put("dialog.patches.empty_clipboard.msg", "Clipboard is empty or does not contain text.", "Буфер обмена пуст или не содержит текста.");
@@ -442,8 +449,8 @@ public final class I18n {
                 "Select interface language (English or Russian).\nSwitches immediately across all dialogs, tables, and toolbar actions.",
                 "Выберите язык интерфейса плагина (English или Русский).\nЯзык переключается мгновенно во всех окнах, таблицах и действиях тулбара.");
         put("help.patches.table",
-                "List of Git patches (.patch / .diff) applied to your working directory before the build stage, and auto-reverted immediately after build finishes.\n• Check 'Active' to include in the pipeline.\n• Select a target in 'Profile' or leave it on 'All'.\n• Use 'Paste from Clipboard...' to create patches from git diff.",
-                "Список Git-патчей (.patch / .diff), автоматически применяемых к рабочей копии перед этапом сборки и автоматически откатываемых сразу после завершения сборки.\n• Отметьте 'Активен', чтобы включить патч в пайплайн.\n• Выберите нужный профиль в колонке 'Профиль' или оставьте 'Все'.\n• Нажмите 'Вставить из буфера...', чтобы создать патч из git diff.");
+                "Git patches are applied before the build and can be reverted after it.\n• Check 'Active' to include a patch in the pipeline.\n• Open 'Parent Branch' and type to search. The pipeline applies a patch on the selected branch and branches containing its latest commit. Choose 'All' to allow any branch.\n• Use 'Paste from Clipboard...' to create patches from git diff.",
+                "Git-патчи применяются перед сборкой и могут быть отменены после неё.\n• Отметьте 'Активен', чтобы включить патч в пайплайн.\n• Откройте список 'Родительская ветка' и начните вводить имя. Пайплайн применяет патч к выбранной ветке и к веткам, содержащим её последний коммит. Выберите 'Все', чтобы разрешить любую ветку.\n• Нажмите 'Вставить из буфера...', чтобы создать патч из git diff.");
         put("help.patches.revert_before_apply",
                 "Discards any local uncommitted/dirty changes in files targeted by git patches (git checkout -- <file>) to ensure patches apply cleanly without merge conflicts.",
                 "Сбрасывает любые локальные незакоммиченные изменения в целевых файлах патча (git checkout -- <файл>), гарантируя чистое применение без конфликтов.");

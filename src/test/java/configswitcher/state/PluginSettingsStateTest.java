@@ -5,6 +5,7 @@ import configswitcher.model.ExecutionMode;
 import configswitcher.model.GitPatchEntry;
 import configswitcher.model.SwitchMode;
 import configswitcher.model.TerminalShellType;
+import org.jdom.Element;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -195,20 +196,27 @@ public class PluginSettingsStateTest {
     }
 
     @Test
-    public void testLoadStatePreservesPatchProfileSelection() {
+    public void testLoadStatePreservesPatchBranchSelection() {
         PluginSettingsState.State saved = new PluginSettingsState.State();
-        saved.gitPatches.add(new GitPatchEntry(true, ".idea/patches/p1.patch", "Dev patch", "dev"));
+        saved.gitPatches.add(new GitPatchEntry(true, ".idea/patches/p1.patch", "Dev patch", "refs/heads/dev"));
         saved.gitPatches.add(new GitPatchEntry(true, ".idea/patches/p2.patch", "Shared patch", null));
 
         settings.loadState(XmlSerializer.deserialize(
                 XmlSerializer.serialize(saved), PluginSettingsState.State.class));
 
-        List<GitPatchEntry> patches = settings.getState().gitPatches;
-        assertEquals(saved.gitPatches, patches);
-        assertTrue(patches.get(0).matchesProfile("dev"));
-        assertFalse(patches.get(0).matchesProfile("prod"));
-        assertTrue(patches.get(1).matchesProfile("dev"));
-        assertTrue(patches.get(1).matchesProfile("prod"));
+        assertEquals(saved.gitPatches, settings.getState().gitPatches);
+    }
+
+    @Test
+    public void testLegacyPatchWithProfileDefaultsToAllBranches() {
+        Element patch = new Element("GitPatchEntry");
+        patch.addContent(new Element("option").setAttribute("name", "patchPath").setAttribute("value", "old.patch"));
+        patch.addContent(new Element("option").setAttribute("name", "applicableProfile").setAttribute("value", "dev"));
+
+        GitPatchEntry loaded = XmlSerializer.deserialize(patch, GitPatchEntry.class);
+
+        assertEquals("old.patch", loaded.getPatchPath());
+        assertEquals("", loaded.getParentBranch());
     }
 
     @Test

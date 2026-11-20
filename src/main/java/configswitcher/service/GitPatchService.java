@@ -279,7 +279,6 @@ public final class GitPatchService implements Disposable {
     @NotNull
     public GitPatchEntry createPatchFromClipboard(
             @NotNull String patchName,
-            @Nullable String profile,
             @Nullable String description
     ) throws Exception {
         String clipboardText = getClipboardText();
@@ -317,7 +316,7 @@ public final class GitPatchService implements Disposable {
                 true,
                 relativePath,
                 description != null ? description : "",
-                profile != null ? profile : ""
+                ""
         );
 
         PluginSettingsState.State settings = PluginSettingsState.getInstance(project).getState();
@@ -327,35 +326,68 @@ public final class GitPatchService implements Disposable {
         return entry;
     }
 
-    public synchronized boolean applyConfiguredPatches(@NotNull String activeProfile) {
+    public List<String> listBranchRefs() {
+        return listBranchRefs(false);
+    }
+
+    private List<String> listBranchRefs(boolean mergedIntoHead) {
+        List<String> command = new ArrayList<>(List.of("for-each-ref",
+                "--format=%(if)%(symref)%(then)%(else)%(refname)%(end)"));
+        if (mergedIntoHead) command.add("--merged=HEAD");
+        command.addAll(List.of("refs/heads/", "refs/remotes/"));
+        ProcessOutput output = runGitCommand(command.toArray(String[]::new));
+        if (output.getExitCode() != 0) return List.of();
+        return output.getStdout().lines().filter(ref -> !ref.isBlank()).toList();
+    }
+
+    private Set<String> currentAndAncestorBranchRefs() {
+        ProcessOutput currentBranch = runGitCommand("symbolic-ref", "--quiet", "HEAD");
+        if (currentBranch.getExitCode() != 0) return Set.of();
+        Set<String> refs = new LinkedHashSet<>(listBranchRefs(true));
+        refs.add(currentBranch.getStdout().strip());
+        return refs;
+    }
+
+    public synchronized boolean applyConfiguredPatches() {
         PluginSettingsState.State settings = PluginSettingsState.getInstance(project).getState();
         List<GitPatchEntry> toApply = new ArrayList<>();
+        Set<String> matchingBranches = null;
         for (GitPatchEntry entry : settings.gitPatches) {
-            if (entry.matchesProfile(activeProfile)) {
-                toApply.add(entry);
+            if (!entry.isEnabled()) continue;
+            String parentBranch = entry.getParentBranch();
+            if (!parentBranch.isBlank()) {
+                if (matchingBranches == null) matchingBranches = currentAndAncestorBranchRefs();
+                if (!matchingBranches.contains(parentBranch)) continue;
             }
+            toApply.add(entry);
         }
 
         if (toApply.isEmpty()) {
             return true;
         }
 
-        ConfigSwitcherLog.info(project, "GitPatchService: Applying " + toApply.size() + " patch(es) for active profile '" + activeProfile + "'");
+        ConfigSwitcherLog.info(project, "GitPatchService: Applying " + toApply.size() + " configured patch(es)");
         if (!applyPatches(toApply, settings.revertPatchFilesBeforeApply)) return false;
 
-        ConfigNotifier.notifyInfo(project, "Applied " + toApply.size() + " git patch(es) for active profile '" + activeProfile + "'.");
+        ConfigNotifier.notifyInfo(project, "Applied " + toApply.size() + " git patch(es).");
         return true;
     }
 
     public synchronized boolean applySelectedPatch(@NotNull GitPatchEntry entry) {
         File patchFile = resolvePatchFile(entry.getPatchPath());
+        GitPatchEntry previousApplication = null;
         for (GitPatchEntry applied : appliedPatchesJournal) {
             if (FileUtil.filesEqual(patchFile, resolvePatchFile(applied.getPatchPath()))) {
-                ConfigNotifier.notifyInfo(project, I18n.get(project, "notification.patches.already_applied", entry.getPatchPath()));
-                return true;
+                if (runGitCommand("apply", "--reverse", "--check", "--whitespace=nowarn", patchFile.getAbsolutePath()).getExitCode() == 0) {
+                    ConfigNotifier.notifyInfo(project, I18n.get(project, "notification.patches.already_applied", entry.getPatchPath()));
+                    return true;
+                }
+                previousApplication = applied;
+                break;
             }
         }
         if (!applyPatches(List.of(entry), false)) return false;
+        if (previousApplication != null) appliedPatchesJournal.remove(previousApplication);
 
         ConfigNotifier.notifyInfo(project, I18n.get(project, "notification.patches.applied", entry.getPatchPath()));
         return true;

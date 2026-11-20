@@ -2,9 +2,11 @@ package configswitcher.ui;
 
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory;
+import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.options.SearchableConfigurable;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
@@ -12,6 +14,8 @@ import com.intellij.openapi.progress.Task;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
+import com.intellij.openapi.vcs.changes.patch.ApplyPatchAction;
+import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.ui.components.JBCheckBox;
 import com.intellij.ui.components.JBLabel;
@@ -22,7 +26,6 @@ import com.intellij.ui.table.JBTable;
 import com.intellij.util.ui.JBUI;
 import configswitcher.i18n.I18n;
 import configswitcher.i18n.PluginLanguage;
-import configswitcher.model.ConfigFileModel;
 import configswitcher.model.ExecutionMode;
 import configswitcher.model.GitPatchEntry;
 import configswitcher.model.SwitchMode;
@@ -32,6 +35,7 @@ import configswitcher.service.ConfigScannerService;
 import configswitcher.service.GitPatchService;
 import configswitcher.service.SessionLogManager;
 import configswitcher.state.PluginSettingsState;
+import configswitcher.util.ConfigNotifier;
 import configswitcher.util.ConfigSwitcherLog;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NotNull;
@@ -42,13 +46,17 @@ import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.util.*;
 import java.util.List;
 
 @SuppressWarnings("deprecation")
 public class PluginSettingsConfigurable implements SearchableConfigurable {
     public static final String ID = "configswitcher.settings";
-    private static final int PATCH_PROFILE_COLUMN = 3;
+    private static final int PATCH_BRANCH_COLUMN = 3;
 
     private final Project project;
     private final PluginSettingsState settings;
@@ -64,11 +72,12 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
     private JPanel patchesPanel;
     private DefaultTableModel patchTableModel;
     private JBTable patchTable;
+    private volatile List<String> patchBranchRefs = List.of();
     private JButton pastePatchBtn;
     private JButton addPatchFileBtn;
     private JButton removePatchBtn;
+    private JButton copyPatchBtn;
     private JButton applySelectedPatchBtn;
-    private boolean applyingSelectedPatch;
     private JButton revertNowBtn;
     private JBCheckBox revertBeforeApplyCheckbox;
     private JBCheckBox autoRevertPatchesCheckbox;
@@ -190,7 +199,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         patchesPanel = new JPanel(new BorderLayout(0, JBUI.scale(6)));
         patchesPanel.setBorder(BorderFactory.createTitledBorder(I18n.get(PluginLanguage.EN, "settings.patches.title")));
 
-        String[] columns = {"Active", "Patch File Path", "Description", "Profile"};
+        String[] columns = {"Active", "Patch File Path", "Description", "Parent Branch"};
         patchTableModel = new DefaultTableModel(columns, 0) {
             @Override
             public Class<?> getColumnClass(int columnIndex) {
@@ -201,7 +210,10 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         patchTable.setPreferredScrollableViewportSize(new Dimension(JBUI.scale(550), JBUI.scale(100)));
         patchTable.getColumnModel().getColumn(0).setMaxWidth(JBUI.scale(50));
         patchTable.putClientProperty("terminateEditOnFocusLost", true);
-        configurePatchProfileColumn();
+        configurePatchBranchColumn();
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (!project.isDisposed()) patchBranchRefs = GitPatchService.getInstance(project).listBranchRefs();
+        });
 
         patchesPanel.add(new JScrollPane(patchTable), BorderLayout.CENTER);
 
@@ -257,11 +269,17 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         });
         patchButtonsPanel.add(removePatchBtn);
 
+        JPanel patchActionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, JBUI.scale(4), 0));
+        copyPatchBtn = new JButton("Put Patch to Clipboard");
+        copyPatchBtn.setEnabled(false);
+        copyPatchBtn.addActionListener(e -> copySelectedPatch());
+        patchActionsPanel.add(copyPatchBtn);
+
         applySelectedPatchBtn = new JButton("Apply Selected");
         applySelectedPatchBtn.setEnabled(false);
         applySelectedPatchBtn.addActionListener(e -> applySelectedPatch());
-        patchTable.getSelectionModel().addListSelectionListener(e -> updateApplySelectedPatchButton());
-        patchButtonsPanel.add(applySelectedPatchBtn);
+        patchTable.getSelectionModel().addListSelectionListener(e -> updateSelectedPatchButtons());
+        patchActionsPanel.add(applySelectedPatchBtn);
 
         revertNowBtn = new JButton("Revert Applied Patches Now");
         revertNowBtn.setToolTipText("Manually reverse any git patches that are currently applied to the working copy");
@@ -282,10 +300,10 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                 }
             });
         });
-        patchButtonsPanel.add(revertNowBtn);
+        patchActionsPanel.add(revertNowBtn);
 
         patchesTableHelp = new HelpLabel(I18n.get(PluginLanguage.EN, "help.patches.table"));
-        patchButtonsPanel.add(patchesTableHelp);
+        patchActionsPanel.add(patchesTableHelp);
 
         JPanel patchOptionsPanel = new JPanel(new GridLayout(3, 1, 0, JBUI.scale(2)));
 
@@ -316,6 +334,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
 
         JPanel patchBottomPanel = new JPanel(new BorderLayout(0, JBUI.scale(4)));
         patchBottomPanel.add(patchButtonsPanel, BorderLayout.NORTH);
+        patchBottomPanel.add(patchActionsPanel, BorderLayout.CENTER);
         patchBottomPanel.add(patchOptionsPanel, BorderLayout.SOUTH);
 
         patchesPanel.add(patchBottomPanel, BorderLayout.SOUTH);
@@ -544,7 +563,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
             patchTable.getColumnModel().getColumn(0).setHeaderValue(I18n.get(lang, "settings.patches.col.active"));
             patchTable.getColumnModel().getColumn(1).setHeaderValue(I18n.get(lang, "settings.patches.col.path"));
             patchTable.getColumnModel().getColumn(2).setHeaderValue(I18n.get(lang, "settings.patches.col.description"));
-            patchTable.getColumnModel().getColumn(PATCH_PROFILE_COLUMN).setHeaderValue(I18n.get(lang, "settings.patches.col.profile"));
+            patchTable.getColumnModel().getColumn(PATCH_BRANCH_COLUMN).setHeaderValue(I18n.get(lang, "settings.patches.col.branch"));
             patchTable.getTableHeader().repaint();
             patchTable.repaint();
         }
@@ -554,6 +573,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         }
         if (addPatchFileBtn != null) addPatchFileBtn.setText(I18n.get(lang, "settings.patches.btn.add"));
         if (removePatchBtn != null) removePatchBtn.setText(I18n.get(lang, "settings.patches.btn.remove"));
+        if (copyPatchBtn != null) copyPatchBtn.setText(I18n.get(lang, "settings.patches.btn.copy"));
         if (applySelectedPatchBtn != null) {
             applySelectedPatchBtn.setText(I18n.get(lang, "settings.patches.btn.apply"));
             applySelectedPatchBtn.setToolTipText(I18n.get(lang, "settings.patches.btn.apply.tooltip"));
@@ -634,73 +654,97 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
         return ConfigSwitcherLog.getLogDirectory(project).getAbsolutePath();
     }
 
-    private void configurePatchProfileColumn() {
-        ComboBox<String> profileCombo = new ComboBox<>();
-        profileCombo.setRenderer(new DefaultListCellRenderer() {
+    private void configurePatchBranchColumn() {
+        ComboBox<String> branchCombo = new ComboBox<>();
+        branchCombo.setSwingPopup(false);
+        branchCombo.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value, int index,
                                                          boolean selected, boolean focused) {
-                return super.getListCellRendererComponent(list, patchProfileLabel((String) value), index, selected, focused);
+                return super.getListCellRendererComponent(list, patchBranchLabel((String) value), index, selected, focused);
             }
         });
 
-        var column = patchTable.getColumnModel().getColumn(PATCH_PROFILE_COLUMN);
+        var column = patchTable.getColumnModel().getColumn(PATCH_BRANCH_COLUMN);
         column.setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             protected void setValue(Object value) {
-                super.setValue(patchProfileLabel((String) value));
+                super.setValue(patchBranchLabel((String) value));
             }
         });
-        column.setCellEditor(new DefaultCellEditor(profileCombo) {
+        column.setCellEditor(new DefaultCellEditor(branchCombo) {
             @Override
             public Component getTableCellEditorComponent(JTable table, Object value, boolean selected, int row, int col) {
-                String profile = (String) value;
-                if (profile == null || profile.isBlank()) profile = "";
-                Set<String> profiles = new LinkedHashSet<>();
-                profiles.add("");
-                for (ConfigFileModel config : ConfigScannerService.getInstance(project).getConfigurations()) {
-                    profiles.add(config.getProfile());
-                }
-                profiles.add(profile);
-                profileCombo.setModel(new DefaultComboBoxModel<>(profiles.toArray(String[]::new)));
-                return super.getTableCellEditorComponent(table, profile, selected, row, col);
+                String branch = (String) value;
+                if (branch == null || branch.isBlank()) branch = "";
+                Set<String> choices = new LinkedHashSet<>();
+                choices.add("");
+                choices.addAll(patchBranchRefs);
+                choices.add(branch);
+                branchCombo.setModel(new DefaultComboBoxModel<>(choices.toArray(String[]::new)));
+                return super.getTableCellEditorComponent(table, branch, selected, row, col);
             }
         });
     }
 
-    private String patchProfileLabel(@Nullable String profile) {
-        if (profile != null && !profile.isBlank()) return profile;
+    private String patchBranchLabel(@Nullable String branch) {
+        if (branch != null && !branch.isBlank()) return branch.replaceFirst("^refs/(heads|remotes)/", "");
         PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
-        return I18n.get(lang != null ? lang : PluginLanguage.EN, "settings.patches.profile.all");
+        return I18n.get(lang != null ? lang : PluginLanguage.EN, "settings.patches.branch.all");
     }
 
-    private void updateApplySelectedPatchButton() {
-        applySelectedPatchBtn.setEnabled(!applyingSelectedPatch && patchTable.getSelectedRowCount() == 1);
+    private void updateSelectedPatchButtons() {
+        boolean oneSelected = patchTable.getSelectedRowCount() == 1;
+        copyPatchBtn.setEnabled(oneSelected);
+        applySelectedPatchBtn.setEnabled(oneSelected);
+    }
+
+    private @Nullable GitPatchEntry getSelectedPatch() {
+        if (patchTable.getSelectedRowCount() != 1) return null;
+        if (patchTable.isEditing() && !patchTable.getCellEditor().stopCellEditing()) return null;
+        return getPatchFromTable(patchTable.convertRowIndexToModel(patchTable.getSelectedRow()));
+    }
+
+    private void copySelectedPatch() {
+        GitPatchEntry entry = getSelectedPatch();
+        if (entry == null) return;
+
+        String path = entry.getPatchPath();
+        PluginLanguage selectedLanguage = (PluginLanguage) languageCombo.getSelectedItem();
+        PluginLanguage lang = selectedLanguage != null ? selectedLanguage : PluginLanguage.EN;
+        String title = I18n.get(lang, "settings.patches.btn.copy");
+        try {
+            GitPatchService service = GitPatchService.getInstance(project);
+            String text = ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                    () -> Files.readString(service.resolvePatchFile(path).toPath()), title, false, project);
+            CopyPasteManager.getInstance().setContents(new StringSelection(text));
+            ConfigNotifier.notifyInfo(project, I18n.get(lang, "notification.patches.copied", path));
+        } catch (IOException | InvalidPathException | IllegalStateException e) {
+            Messages.showErrorDialog(project, I18n.get(lang, "dialog.patches.copy_error", path, e.getMessage()), title);
+        }
     }
 
     private void applySelectedPatch() {
-        int row = patchTable.getSelectedRow();
-        if (row < 0 || patchTable.getSelectedRowCount() != 1 || applyingSelectedPatch) return;
-        if (patchTable.isEditing() && !patchTable.getCellEditor().stopCellEditing()) return;
-        GitPatchEntry entry = getPatchFromTable(patchTable.convertRowIndexToModel(row));
+        GitPatchEntry entry = getSelectedPatch();
         if (entry == null) return;
 
-        PluginLanguage lang = (PluginLanguage) languageCombo.getSelectedItem();
-        String title = I18n.get(lang != null ? lang : PluginLanguage.EN, "task.patches.apply");
-        applyingSelectedPatch = true;
-        updateApplySelectedPatchButton();
-        ProgressManager.getInstance().run(new Task.Backgroundable(project, title, false) {
-            @Override
-            public void run(@NotNull ProgressIndicator indicator) {
-                GitPatchService.getInstance(project).applySelectedPatch(entry);
-            }
+        PluginLanguage selectedLanguage = (PluginLanguage) languageCombo.getSelectedItem();
+        PluginLanguage lang = selectedLanguage != null ? selectedLanguage : PluginLanguage.EN;
+        String title = I18n.get(lang, "task.patches.apply");
+        GitPatchService service = GitPatchService.getInstance(project);
+        boolean applied = ProgressManager.getInstance().runProcessWithProgressSynchronously(
+                () -> service.applySelectedPatch(entry), title, false, project);
+        if (applied) return;
 
-            @Override
-            public void onFinished() {
-                applyingSelectedPatch = false;
-                updateApplySelectedPatchButton();
-            }
-        });
+        VirtualFile patch = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(service.resolvePatchFile(entry.getPatchPath()));
+        if (patch == null || patch.isDirectory()) {
+            Messages.showErrorDialog(project, I18n.get(lang, "dialog.patches.missing", entry.getPatchPath()), title);
+        } else if (Messages.showYesNoDialog(project, I18n.get(lang, "dialog.patches.review", entry.getPatchPath()),
+                title, Messages.getQuestionIcon()) == Messages.YES) {
+            ApplicationManager.getApplication().invokeLater(
+                    () -> ApplyPatchAction.showApplyPatch(project, patch),
+                    ModalityState.stateForComponent(patchTable), project.getDisposed());
+        }
     }
 
     private @Nullable GitPatchEntry getPatchFromTable(int row) {
@@ -711,7 +755,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                 Boolean.TRUE.equals(patchTableModel.getValueAt(row, 0)),
                 path.trim(),
                 desc != null ? desc.trim() : "",
-                (String) patchTableModel.getValueAt(row, PATCH_PROFILE_COLUMN)
+                (String) patchTableModel.getValueAt(row, PATCH_BRANCH_COLUMN)
         );
     }
 
@@ -739,7 +783,7 @@ public class PluginSettingsConfigurable implements SearchableConfigurable {
                 entry.isEnabled(),
                 entry.getPatchPath(),
                 entry.getDescription(),
-                entry.getApplicableProfile()
+                entry.getParentBranch()
         });
     }
 

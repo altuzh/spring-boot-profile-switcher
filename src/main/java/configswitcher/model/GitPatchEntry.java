@@ -9,16 +9,16 @@ public class GitPatchEntry {
     public boolean enabled = true;
     public String patchPath = "";
     public String description = "";
-    public String applicableProfile = "";
+    public String parentBranch = "";
 
     public GitPatchEntry() {
     }
 
-    public GitPatchEntry(boolean enabled, @NotNull String patchPath, @NotNull String description, @Nullable String applicableProfile) {
+    public GitPatchEntry(boolean enabled, @NotNull String patchPath, @NotNull String description, @Nullable String parentBranch) {
         this.enabled = enabled;
         this.patchPath = patchPath;
         this.description = description;
-        this.applicableProfile = applicableProfile != null ? applicableProfile : "";
+        setParentBranch(parentBranch);
     }
 
     public boolean isEnabled() {
@@ -48,29 +48,12 @@ public class GitPatchEntry {
     }
 
     @NotNull
-    public String getApplicableProfile() {
-        return applicableProfile;
+    public String getParentBranch() {
+        return parentBranch != null ? parentBranch : "";
     }
 
-    public void setApplicableProfile(@Nullable String applicableProfile) {
-        this.applicableProfile = applicableProfile != null ? applicableProfile : "";
-    }
-
-    public boolean matchesProfile(@NotNull String currentProfile) {
-        if (!enabled) return false;
-        if (applicableProfile == null || applicableProfile.isBlank()) return true;
-        String[] targets = applicableProfile.toLowerCase().split(",");
-        String[] actives = currentProfile.toLowerCase().split(",");
-        for (String t : targets) {
-            String trimmedTarget = t.trim();
-            if (trimmedTarget.isEmpty()) continue;
-            for (String a : actives) {
-                if (trimmedTarget.equalsIgnoreCase(a.trim())) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    public void setParentBranch(@Nullable String parentBranch) {
+        this.parentBranch = parentBranch != null ? parentBranch : "";
     }
 
     @Override
@@ -81,17 +64,17 @@ public class GitPatchEntry {
         return enabled == that.enabled &&
                 Objects.equals(patchPath, that.patchPath) &&
                 Objects.equals(description, that.description) &&
-                Objects.equals(applicableProfile, that.applicableProfile);
+                getParentBranch().equals(that.getParentBranch());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(enabled, patchPath, description, applicableProfile);
+        return Objects.hash(enabled, patchPath, description, getParentBranch());
     }
 
     @Override
     public String toString() {
-        String profileInfo = applicableProfile.isBlank() ? "all" : applicableProfile;
-        return (enabled ? "[v] " : "[ ] ") + patchPath + " (" + profileInfo + ")";
+        String branchInfo = getParentBranch().isBlank() ? "all" : getParentBranch();
+        return (enabled ? "[v] " : "[ ] ") + patchPath + " (" + branchInfo + ")";
     }
 }

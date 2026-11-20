@@ -176,22 +176,6 @@ public class ConfigScannerTest {
     }
 
     @Test
-    public void testGitPatchEntry_ProfileMatching() {
-        configswitcher.model.GitPatchEntry universal = new configswitcher.model.GitPatchEntry(true, ".idea/patches/p1.patch", "All profiles", "");
-        assertTrue(universal.matchesProfile("dev"));
-        assertTrue(universal.matchesProfile("auth-dev"));
-        assertTrue(universal.matchesProfile("prod"));
-
-        configswitcher.model.GitPatchEntry authOnly = new configswitcher.model.GitPatchEntry(true, ".idea/patches/auth.patch", "Auth only", "auth-dev");
-        assertTrue(authOnly.matchesProfile("auth-dev"));
-        assertFalse(authOnly.matchesProfile("dev"));
-        assertFalse(authOnly.matchesProfile("prod"));
-
-        configswitcher.model.GitPatchEntry disabled = new configswitcher.model.GitPatchEntry(false, ".idea/patches/p2.patch", "Disabled", "");
-        assertFalse(disabled.matchesProfile("dev"));
-    }
-
-    @Test
     public void testBuildRunCommandLine() {
         String template = "java -jar target/server.jar --debug --spring.profiles.active={profile}";
         String result = AppRunManager.buildRunCommandLine(
@@ -666,22 +650,6 @@ public class ConfigScannerTest {
                 null
         );
         assertEquals("java -jar server.jar --spring.profiles.active=dev,auth-dev", result);
-    }
-
-    @Test
-    public void testGitPatchEntry_MultiProfileMatching() {
-        configswitcher.model.GitPatchEntry devPatch = new configswitcher.model.GitPatchEntry(true, "p1.patch", "Dev patch", "dev");
-        configswitcher.model.GitPatchEntry localPatch = new configswitcher.model.GitPatchEntry(true, "p2.patch", "Local patch", "local");
-        configswitcher.model.GitPatchEntry prodPatch = new configswitcher.model.GitPatchEntry(true, "p3.patch", "Prod patch", "prod");
-
-        // Combined profile "dev,local" matches both dev and local patches, but not prod
-        assertTrue(devPatch.matchesProfile("dev,local"));
-        assertTrue(localPatch.matchesProfile("dev,local"));
-        assertFalse(prodPatch.matchesProfile("dev,local"));
-
-        // Single profile
-        assertTrue(devPatch.matchesProfile("dev"));
-        assertFalse(localPatch.matchesProfile("dev"));
     }
 
     @Test

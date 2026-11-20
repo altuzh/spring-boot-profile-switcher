@@ -92,7 +92,6 @@ public class PasteGitPatchDialog extends DialogWrapper {
             GitPatchService service = GitPatchService.getInstance(project);
             createdEntry = service.createPatchFromClipboard(
                     name,
-                    "",
                     descriptionField.getText().trim()
             );
             super.doOKAction();

@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'configswitcher'
-version = '1.0.32'
+version = '1.0.33'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17

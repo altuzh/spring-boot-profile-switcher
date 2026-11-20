@@ -599,7 +599,7 @@ public final class AppRunManager implements Disposable {
         }
 
         if (preRunCmd != null) {
-            if (!patchService.applyConfiguredPatches(profile)) {
+            if (!patchService.applyConfiguredPatches()) {
                 ConfigNotifier.notifyError(project, "Pre-run aborted due to git patch failure.");
                 return;
             }
